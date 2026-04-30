@@ -27,14 +27,10 @@ const severeCategories = [
 ];
 
 export class OpenAIModerationService {
-  private readonly openai: OpenAI;
+  private openai?: OpenAI;
   private rateLimitedUntil = 0;
 
-  constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
-  }
+  constructor() {}
 
   async analyzeMessage(text: string): Promise<OpenAIModerationResult> {
     if (!AUTOMOD_CONFIG.moderation.enabled) {
@@ -66,7 +62,7 @@ export class OpenAIModerationService {
     }
 
     try {
-      const response = await this.openai.moderations.create({
+      const response = await this.getClient().moderations.create({
         model: AUTOMOD_CONFIG.moderation.model,
         input: trimmedText
       });
@@ -169,5 +165,13 @@ export class OpenAIModerationService {
     }
 
     return AUTOMOD_CONFIG.moderation.rateLimitCooldownMs;
+  }
+
+  private getClient() {
+    this.openai ??= new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+
+    return this.openai;
   }
 }

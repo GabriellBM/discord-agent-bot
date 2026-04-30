@@ -225,6 +225,8 @@ OPENAI_MODERATION_MODEL=omni-moderation-latest
 | Dev | `npm run dev` | Inicia o bot com `tsx watch` |
 | Build | `npm run build` | Compila TypeScript para `dist/` |
 | Start | `npm start` | Executa a versao compilada |
+| Test | `npm test` | Executa a suite de testes unitarios com Vitest |
+| Test Watch | `npm run test:watch` | Executa os testes em modo observacao |
 
 ---
 
@@ -247,6 +249,7 @@ Checks executados:
 | `Environment Contract` | Confere se `.env.example` possui as variaveis obrigatorias e nao contem segredos reais |
 | `Dependency Audit` | Instala dependencias com `npm ci` e roda `npm audit --omit=dev --audit-level=high` |
 | `Typecheck Node 22/24` | Executa `npm run typecheck` em matriz com Node.js 22 e 24 |
+| `Unit Tests Node 22/24` | Executa `npm test` em matriz com Node.js 22 e 24 |
 | `Production Build` | Compila com `npm run build` no Node.js 24 e publica `dist/` como artefato temporario |
 
 Essa esteira ajuda a impedir que dados sensiveis ou arquivos runtime entrem no repositorio, valida o contrato de ambiente, checa dependencias vulneraveis e confirma que o bot continua compilando antes de integrar mudancas.

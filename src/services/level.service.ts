@@ -44,12 +44,14 @@ interface PendingMaxRoleRequest {
   level: number;
 }
 
-const levelsFilePath = path.join(process.cwd(), "src", "data", "levels.json");
+const defaultLevelsFilePath = path.join(process.cwd(), "src", "data", "levels.json");
 const pendingMaxRoleRequests = new Map<string, PendingMaxRoleRequest>();
 const pendingHigherRoleRequests = new Map<string, PendingMaxRoleRequest>();
 const logService = new LogService();
 
 export class LevelService {
+  constructor(private readonly levelsFilePath = defaultLevelsFilePath) {}
+
   async getUser(guildId: string, userId: string) {
     const database = await this.readDatabase();
     return this.getOrCreateUser(database, guildId, userId);
@@ -627,8 +629,8 @@ export class LevelService {
 
   private async readDatabase(): Promise<LevelDatabase> {
     try {
-      await mkdir(path.dirname(levelsFilePath), { recursive: true });
-      const content = await readFile(levelsFilePath, "utf-8");
+      await mkdir(path.dirname(this.levelsFilePath), { recursive: true });
+      const content = await readFile(this.levelsFilePath, "utf-8");
 
       if (!content.trim()) {
         return {};
@@ -636,13 +638,13 @@ export class LevelService {
 
       return JSON.parse(content) as LevelDatabase;
     } catch (error) {
-      await writeFile(levelsFilePath, "{}\n", "utf-8");
+      await writeFile(this.levelsFilePath, "{}\n", "utf-8");
       return {};
     }
   }
 
   private async writeDatabase(database: LevelDatabase) {
-    await mkdir(path.dirname(levelsFilePath), { recursive: true });
-    await writeFile(levelsFilePath, `${JSON.stringify(database, null, 2)}\n`, "utf-8");
+    await mkdir(path.dirname(this.levelsFilePath), { recursive: true });
+    await writeFile(this.levelsFilePath, `${JSON.stringify(database, null, 2)}\n`, "utf-8");
   }
 }
