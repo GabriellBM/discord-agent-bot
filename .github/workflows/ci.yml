@@ -40,27 +40,163 @@ jobs:
             exit 1
           fi
 
-      - name: Ensure runtime level database is not tracked
+      - name: Ensure runtime files are not tracked
         shell: bash
         run: |
-          if git ls-files --error-unmatch src/data/levels.json >/dev/null 2>&1; then
-            echo "src/data/levels.json contains runtime data and must not be tracked."
-            exit 1
-          fi
+          forbidden_files=(
+            "src/data/levels.json"
+            "dist"
+            "node_modules"
+          )
+
+          for file in "${forbidden_files[@]}"; do
+            if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+              echo "$file should not be tracked."
+              exit 1
+            fi
+          done
 
       - name: Check required project files
         shell: bash
         run: |
-          test -f package.json
-          test -f package-lock.json
-          test -f tsconfig.json
-          test -f .env.example
-          test -f src/index.ts
+          required_files=(
+            "package.json"
+            "package-lock.json"
+            "tsconfig.json"
+            ".env.example"
+            "src/index.ts"
+            "src/services/commandLoader.ts"
+            "src/services/eventLoader.ts"
+            "src/services/registerCommands.ts"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "Missing required file: $file"
+              exit 1
+            fi
+          done
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Scan tracked files for common leaked secrets
+        shell: bash
+        run: |
+          secret_matches="$(
+            git grep -n -I -E \
+              '([A-Za-z0-9_-]{23,30}\.[A-Za-z0-9_-]{6,10}\.[A-Za-z0-9_-]{25,110})|(sk-[A-Za-z0-9_-]{20,})|(xox[baprs]-[A-Za-z0-9-]{20,})' \
+              -- \
+              ':!package-lock.json' \
+              ':!.env.example' \
+              || true
+          )"
+
+          if [ -n "$secret_matches" ]; then
+            echo "Potential secret found in tracked files:"
+            echo "$secret_matches"
+            exit 1
+          fi
+
+  env-example:
+    name: Environment Contract
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate .env.example keys
+        shell: bash
+        run: |
+          required_keys=(
+            "DISCORD_TOKEN"
+            "DISCORD_CLIENT_ID"
+            "DISCORD_GUILD_ID"
+            "OPENAI_API_KEY"
+            "OPENAI_MODEL"
+            "OPENAI_MODERATION_MODEL"
+          )
+
+          for key in "${required_keys[@]}"; do
+            if ! grep -q "^${key}=" .env.example; then
+              echo "Missing key in .env.example: $key"
+              exit 1
+            fi
+          done
+
+      - name: Ensure .env.example does not contain real-looking secrets
+        shell: bash
+        run: |
+          if grep -E '([A-Za-z0-9_-]{23,30}\.[A-Za-z0-9_-]{6,10}\.[A-Za-z0-9_-]{25,110})|(sk-[A-Za-z0-9_-]{20,})' .env.example; then
+            echo ".env.example appears to contain a real secret."
+            exit 1
+          fi
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    needs:
+      - repository-safety
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  typecheck:
+    name: Typecheck Node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    needs:
+      - repository-safety
+      - secret-scan
+      - env-example
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 22
+          - 24
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
 
   build:
-    name: TypeScript Build
+    name: Production Build
     runs-on: ubuntu-latest
-    needs: repository-safety
+    needs:
+      - typecheck
+      - dependency-audit
 
     steps:
       - name: Checkout repository

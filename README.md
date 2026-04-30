@@ -242,10 +242,14 @@ Checks executados:
 
 | Job | O que valida |
 | --- | --- |
-| `Repository Safety` | Garante que `.env` nao foi versionado, que `src/data/levels.json` ficou fora do Git e que arquivos essenciais existem |
-| `TypeScript Build` | Instala dependencias com `npm ci`, compila o projeto com `npm run build` e publica o `dist/` como artefato temporario |
+| `Repository Safety` | Garante que `.env`, `src/data/levels.json`, `dist` e `node_modules` nao foram versionados e valida arquivos essenciais |
+| `Secret Scan` | Procura padroes comuns de tokens do Discord, chaves OpenAI e outros segredos em arquivos rastreados |
+| `Environment Contract` | Confere se `.env.example` possui as variaveis obrigatorias e nao contem segredos reais |
+| `Dependency Audit` | Instala dependencias com `npm ci` e roda `npm audit --omit=dev --audit-level=high` |
+| `Typecheck Node 22/24` | Executa `npm run typecheck` em matriz com Node.js 22 e 24 |
+| `Production Build` | Compila com `npm run build` no Node.js 24 e publica `dist/` como artefato temporario |
 
-Essa esteira ajuda a impedir que dados sensiveis ou arquivos runtime entrem no repositorio e confirma que o bot continua compilando antes de integrar mudancas.
+Essa esteira ajuda a impedir que dados sensiveis ou arquivos runtime entrem no repositorio, valida o contrato de ambiente, checa dependencias vulneraveis e confirma que o bot continua compilando antes de integrar mudancas.
 
 ---
 
