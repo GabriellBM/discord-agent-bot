@@ -26,6 +26,7 @@
 - [Como instalar](#como-instalar)
 - [Variaveis de ambiente](#variaveis-de-ambiente)
 - [Scripts](#scripts)
+- [CI no GitHub Actions](#ci-no-github-actions)
 - [Comandos do bot](#comandos-do-bot)
 - [Sistema de XP e niveis](#sistema-de-xp-e-niveis)
 - [Cargos automaticos](#cargos-automaticos)
@@ -224,6 +225,27 @@ OPENAI_MODERATION_MODEL=omni-moderation-latest
 | Dev | `npm run dev` | Inicia o bot com `tsx watch` |
 | Build | `npm run build` | Compila TypeScript para `dist/` |
 | Start | `npm start` | Executa a versao compilada |
+
+---
+
+## CI no GitHub Actions
+
+O projeto possui uma esteira em `.github/workflows/ci.yml`.
+
+Ela roda automaticamente em:
+
+- push para `main`, `develop` e `homolog`;
+- pull requests direcionados para `main`, `develop` e `homolog`;
+- execucao manual pelo botao **Run workflow** no GitHub Actions.
+
+Checks executados:
+
+| Job | O que valida |
+| --- | --- |
+| `Repository Safety` | Garante que `.env` nao foi versionado, que `src/data/levels.json` ficou fora do Git e que arquivos essenciais existem |
+| `TypeScript Build` | Instala dependencias com `npm ci`, compila o projeto com `npm run build` e publica o `dist/` como artefato temporario |
+
+Essa esteira ajuda a impedir que dados sensiveis ou arquivos runtime entrem no repositorio e confirma que o bot continua compilando antes de integrar mudancas.
 
 ---
 
