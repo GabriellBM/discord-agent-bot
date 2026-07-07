@@ -200,6 +200,7 @@ DISCORD_TOKEN=COLOQUE_AQUI_O_TOKEN_DO_BOT
 DISCORD_CLIENT_ID=COLOQUE_AQUI_O_CLIENT_ID
 DISCORD_GUILD_ID=COLOQUE_AQUI_O_ID_DO_SERVIDOR_DE_TESTE
 BOT_INTERACTION_CHANNEL_ID=COLOQUE_AQUI_O_ID_DO_CANAL_DE_COMANDOS
+LEVELS_FILE_PATH=src/data/levels.json
 
 OPENAI_API_KEY=COLOQUE_AQUI_SUA_CHAVE_OPENAI
 OPENAI_MODEL=gpt-4.1-mini
@@ -212,6 +213,7 @@ OPENAI_MODERATION_MODEL=omni-moderation-latest
 | `DISCORD_CLIENT_ID` | Sim | ID da aplicacao no Discord Developer Portal |
 | `DISCORD_GUILD_ID` | Recomendado | Registra comandos rapidamente em um servidor especifico |
 | `BOT_INTERACTION_CHANNEL_ID` | Opcional | Canal exclusivo para comandos de usuarios comuns; o owner pode usar comandos em qualquer canal |
+| `LEVELS_FILE_PATH` | Opcional | Caminho do arquivo JSON usado como banco de XP; no Docker use `/app/data/levels.json` |
 | `OPENAI_API_KEY` | Apenas automod/OpenAI | Chave usada pela OpenAI Moderation API e pelo `/ask` |
 | `OPENAI_MODEL` | Opcional | Modelo usado pelo servico OpenAI de perguntas |
 | `OPENAI_MODERATION_MODEL` | Opcional | Modelo de moderacao, padrao `omni-moderation-latest` |
@@ -229,6 +231,52 @@ OPENAI_MODERATION_MODEL=omni-moderation-latest
 | Start | `npm start` | Executa a versao compilada |
 | Test | `npm test` | Executa a suite de testes unitarios com Vitest |
 | Test Watch | `npm run test:watch` | Executa os testes em modo observacao |
+
+---
+
+## Deploy com Docker
+
+No servidor Proxmox com Docker e Docker Compose instalados:
+
+```bash
+git clone https://github.com/GabriellBM/discord-agent-bot.git
+cd discord-agent-bot
+cp .env.example .env
+nano .env
+```
+
+Para Docker, mantenha o banco de XP em volume persistente:
+
+```env
+LEVELS_FILE_PATH=/app/data/levels.json
+```
+
+Suba o bot:
+
+```bash
+docker compose up -d --build
+```
+
+Ver logs em tempo real:
+
+```bash
+docker compose logs -f discord-agent-bot
+```
+
+Parar o bot:
+
+```bash
+docker compose down
+```
+
+Atualizar depois de um novo push:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+O arquivo `levels.json` fica persistido em `./data/levels.json` no servidor.
 
 ---
 

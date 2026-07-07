@@ -72,6 +72,7 @@ web_modules/
 
 # Local runtime data
 src/data/levels.json
+data/
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

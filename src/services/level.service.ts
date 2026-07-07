@@ -19,6 +19,7 @@ import {
   MAX_LEVEL,
   MAX_LEVEL_ROLE
 } from "../config/level.config";
+import { env } from "../config/env";
 import { isUserImmune } from "../utils/automod.util";
 import { LogService } from "./log.service";
 
@@ -49,7 +50,7 @@ interface ApprovalRequestResult {
   message: string;
 }
 
-const defaultLevelsFilePath = path.join(process.cwd(), "src", "data", "levels.json");
+const defaultLevelsFilePath = env.levelsFilePath ?? path.join(process.cwd(), "src", "data", "levels.json");
 const pendingMaxRoleRequests = new Map<string, PendingMaxRoleRequest>();
 const pendingHigherRoleRequests = new Map<string, PendingMaxRoleRequest>();
 const logService = new LogService();

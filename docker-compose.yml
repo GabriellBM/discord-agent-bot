@@ -1,0 +1,13 @@
+services:
+  discord-agent-bot:
+    build:
+      context: .
+    container_name: discord-agent-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      LEVELS_FILE_PATH: /app/data/levels.json
+    volumes:
+      - ./data:/app/data
