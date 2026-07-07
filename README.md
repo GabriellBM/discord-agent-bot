@@ -199,6 +199,7 @@ Exemplo seguro:
 DISCORD_TOKEN=COLOQUE_AQUI_O_TOKEN_DO_BOT
 DISCORD_CLIENT_ID=COLOQUE_AQUI_O_CLIENT_ID
 DISCORD_GUILD_ID=COLOQUE_AQUI_O_ID_DO_SERVIDOR_DE_TESTE
+BOT_INTERACTION_CHANNEL_ID=COLOQUE_AQUI_O_ID_DO_CANAL_DE_COMANDOS
 
 OPENAI_API_KEY=COLOQUE_AQUI_SUA_CHAVE_OPENAI
 OPENAI_MODEL=gpt-4.1-mini
@@ -210,6 +211,7 @@ OPENAI_MODERATION_MODEL=omni-moderation-latest
 | `DISCORD_TOKEN` | Sim | Token usado para logar o bot |
 | `DISCORD_CLIENT_ID` | Sim | ID da aplicacao no Discord Developer Portal |
 | `DISCORD_GUILD_ID` | Recomendado | Registra comandos rapidamente em um servidor especifico |
+| `BOT_INTERACTION_CHANNEL_ID` | Opcional | Canal exclusivo para comandos de usuarios comuns; o owner pode usar comandos em qualquer canal |
 | `OPENAI_API_KEY` | Apenas automod/OpenAI | Chave usada pela OpenAI Moderation API e pelo `/ask` |
 | `OPENAI_MODEL` | Opcional | Modelo usado pelo servico OpenAI de perguntas |
 | `OPENAI_MODERATION_MODEL` | Opcional | Modelo de moderacao, padrao `omni-moderation-latest` |

@@ -3,6 +3,12 @@ import { AUTOMOD_CONFIG } from "../config/automod.config";
 
 export class LogService {
   async send(guild: Guild, title: string, lines: string[]) {
+    const timestamp = new Date();
+    const type = this.getType(title);
+    const consoleLines = this.formatConsoleLines(type, title, lines, timestamp);
+
+    console.log(consoleLines.join("\n"));
+
     try {
       const channel = await guild.channels.fetch(AUTOMOD_CONFIG.logChannelId);
 
@@ -20,30 +26,11 @@ export class LogService {
       }
 
       const embed = new EmbedBuilder()
-        .setTitle(title)
+        .setTitle(`[${type}] ${title}`)
         .setColor(this.getColor(title))
-        .setTimestamp(new Date())
-        .setFooter({ text: `Servidor: ${guild.name}` });
-
-      const fields = lines.map((line) => {
-        const separatorIndex = line.indexOf(":");
-
-        if (separatorIndex === -1) {
-          return {
-            name: "Detalhe",
-            value: this.truncate(line),
-            inline: false
-          };
-        }
-
-        return {
-          name: line.slice(0, separatorIndex).trim(),
-          value: this.truncate(line.slice(separatorIndex + 1).trim() || "-"),
-          inline: false
-        };
-      });
-
-      embed.addFields(fields);
+        .setDescription(this.toCodeBlock(consoleLines))
+        .setTimestamp(timestamp)
+        .setFooter({ text: `Servidor: ${guild.name} | Registro de aplicacao` });
 
       await channel.send({ embeds: [embed] });
       return true;
@@ -54,7 +41,53 @@ export class LogService {
   }
 
   private truncate(value: string) {
-    return value.length > 1024 ? `${value.slice(0, 1020)}...` : value;
+    return value.length > 3800 ? `${value.slice(0, 3796)}...` : value;
+  }
+
+  private formatConsoleLines(type: string, title: string, lines: string[], timestamp: Date) {
+    const header = `[${timestamp.toISOString()}] [${type}] ${title}`;
+    const details = lines.map((line) => {
+      const separatorIndex = line.indexOf(":");
+
+      if (separatorIndex === -1) {
+        return `  detail=${line}`;
+      }
+
+      const key = line.slice(0, separatorIndex).trim().toLowerCase().replaceAll(" ", "_");
+      const value = line.slice(separatorIndex + 1).trim() || "-";
+      return `  ${key}=${value}`;
+    });
+
+    return [header, ...details];
+  }
+
+  private toCodeBlock(lines: string[]) {
+    const content = this.truncate(lines.join("\n"));
+    return `\`\`\`log\n${content}\n\`\`\``;
+  }
+
+  private getType(title: string) {
+    if (title.includes("Automod")) {
+      return "MODERATION";
+    }
+
+    if (title.includes("Voz")) {
+      return "VOICE";
+    }
+
+    if (title.includes("XP") || title.includes("Level")) {
+      return "XP";
+    }
+
+    if (title.includes("Cargo")) {
+      return "ROLE";
+    }
+
+    if (title.includes("Mensagem")) {
+      return "MESSAGE";
+    }
+
+    return "SYSTEM";
   }
 
   private getColor(title: string) {

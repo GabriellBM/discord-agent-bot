@@ -44,6 +44,11 @@ interface PendingMaxRoleRequest {
   level: number;
 }
 
+interface ApprovalRequestResult {
+  ok: boolean;
+  message: string;
+}
+
 const defaultLevelsFilePath = path.join(process.cwd(), "src", "data", "levels.json");
 const pendingMaxRoleRequests = new Map<string, PendingMaxRoleRequest>();
 const pendingHigherRoleRequests = new Map<string, PendingMaxRoleRequest>();
@@ -310,40 +315,28 @@ export class LevelService {
     });
 
     try {
-      const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`approve_max_role:${member.guild.id}:${member.id}`)
-          .setLabel("Aprovar")
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId(`reject_max_role:${member.guild.id}:${member.id}`)
-          .setLabel("Reprovar")
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await channel.send({
+      await this.sendOwnerApprovalRequest(member, {
         content: [
           `📨 <@${member.guild.ownerId}> solicitação de cargo máximo recebida.`,
           `Usuário: ${member.displayName}`,
           `Nível atual: ${level}`,
           `Cargo MAX solicitado`
         ].join("\n"),
-        components: [actionRow]
+        approveCustomId: `approve_max_role:${member.guild.id}:${member.id}`,
+        rejectCustomId: `reject_max_role:${member.guild.id}:${member.id}`
       });
       await logService.send(member.guild, "Log de Cargo MAX", [
-        `Acao: solicitacao enviada no canal`,
+        `Acao: solicitacao enviada na DM do owner`,
         `Usuario: ${member.user.tag}`,
         `ID do usuario: ${member.id}`,
         `Nivel atual: ${level}`,
         `Cargo MAX solicitado: ${MAX_LEVEL_ROLE.roleId}`
       ]);
     } catch (error) {
-      console.error("Erro ao enviar solicitacao de cargo maximo no canal:", error);
-      await channel.send(
-        "⚠️ Não foi possível enviar a solicitação ao dono do servidor. A aprovação do cargo máximo ficou pendente."
-      );
+      pendingMaxRoleRequests.delete(requestKey);
+      console.error("Erro ao enviar solicitacao de cargo maximo por DM:", error);
       await logService.send(member.guild, "Log de Cargo MAX", [
-        `Acao: falha ao enviar solicitacao no canal`,
+        `Acao: falha ao enviar solicitacao na DM do owner`,
         `Usuario: ${member.user.tag}`,
         `ID do usuario: ${member.id}`,
         `Nivel atual: ${level}`,
@@ -376,14 +369,11 @@ export class LevelService {
       }
 
       const member = await guild.members.fetch(userId);
-      const channel = await this.fetchAnnouncementChannel(guild, pendingRequest.channelId);
 
       if (!approved) {
         pendingMaxRoleRequests.delete(requestKey);
         await interaction.reply("❌ Solicitação de cargo máximo reprovada.");
-        await channel?.send(
-          `⚠️ ${member.displayName} atingiu o nível máximo, mas a conquista do cargo final não foi aprovada neste momento.`
-        );
+        await this.notifyMember(member, "Sua conquista de nível máximo não foi aprovada neste momento.");
         return;
       }
 
@@ -399,9 +389,7 @@ export class LevelService {
 
       pendingMaxRoleRequests.delete(requestKey);
       await interaction.reply("✅ Solicitação de cargo máximo aprovada.");
-      await channel?.send(
-        `🔥 Parabéns, ${member.displayName}! Sua conquista de nível máximo foi aprovada e você recebeu o cargo final.`
-      );
+      await this.notifyMember(member, "Sua conquista de nível máximo foi aprovada e você recebeu o cargo final.");
     } catch (error) {
       console.error("Erro ao processar aprovacao de cargo maximo:", error);
 
@@ -414,22 +402,28 @@ export class LevelService {
     }
   }
 
-  async requestHigherRoleApproval(member: GuildMember, channel: GuildTextBasedChannel) {
+  async requestHigherRoleApproval(member: GuildMember, channel: GuildTextBasedChannel): Promise<ApprovalRequestResult> {
     if (!member.roles.cache.has(MAX_LEVEL_ROLE.roleId)) {
-      await channel.send(`🚫 ${member}, você precisa ter o cargo MAX para solicitar o cargo superior.`);
-      return;
+      return {
+        ok: false,
+        message: "🚫 Você precisa ter o cargo MAX para solicitar o cargo superior."
+      };
     }
 
     if (member.roles.cache.has(HIGHER_THAN_MAX_ROLE.roleId)) {
-      await channel.send(`✅ ${member}, você já possui o cargo superior.`);
-      return;
+      return {
+        ok: false,
+        message: "✅ Você já possui o cargo superior."
+      };
     }
 
     const requestKey = this.getMaxRoleRequestKey(member.guild.id, member.id);
 
     if (pendingHigherRoleRequests.has(requestKey)) {
-      await channel.send(`📭 ${member}, você já possui uma solicitação de cargo superior pendente.`);
-      return;
+      return {
+        ok: false,
+        message: "📭 Você já possui uma solicitação de cargo superior pendente."
+      };
     }
 
     pendingHigherRoleRequests.set(requestKey, {
@@ -437,32 +431,44 @@ export class LevelService {
       level: 0
     });
 
-    const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`approve_higher_role:${member.guild.id}:${member.id}`)
-        .setLabel("Aprovar")
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(`reject_higher_role:${member.guild.id}:${member.id}`)
-        .setLabel("Reprovar")
-        .setStyle(ButtonStyle.Danger)
-    );
+    try {
+      await this.sendOwnerApprovalRequest(member, {
+        content: [
+          `📨 <@${member.guild.ownerId}> solicitação de cargo superior recebida.`,
+          `Usuário: ${member.displayName}`,
+          `Cargo superior solicitado`
+        ].join("\n"),
+        approveCustomId: `approve_higher_role:${member.guild.id}:${member.id}`,
+        rejectCustomId: `reject_higher_role:${member.guild.id}:${member.id}`
+      });
 
-    await channel.send({
-      content: [
-        `📨 <@${member.guild.ownerId}> solicitação de cargo superior recebida.`,
-        `Usuário: ${member.displayName}`,
-        `Cargo superior solicitado`
-      ].join("\n"),
-      components: [actionRow]
-    });
+      await logService.send(member.guild, "Log de Cargo Superior", [
+        `Acao: solicitacao enviada na DM do owner`,
+        `Usuario: ${member.user.tag}`,
+        `ID do usuario: ${member.id}`,
+        `Cargo solicitado: ${HIGHER_THAN_MAX_ROLE.roleId}`
+      ]);
 
-    await logService.send(member.guild, "Log de Cargo Superior", [
-      `Acao: solicitacao enviada no canal`,
-      `Usuario: ${member.user.tag}`,
-      `ID do usuario: ${member.id}`,
-      `Cargo solicitado: ${HIGHER_THAN_MAX_ROLE.roleId}`
-    ]);
+      return {
+        ok: true,
+        message: "📨 Sua solicitação foi enviada no privado do owner para aprovação."
+      };
+    } catch (error) {
+      pendingHigherRoleRequests.delete(requestKey);
+      console.error("Erro ao enviar solicitacao de cargo superior por DM:", error);
+      await logService.send(member.guild, "Log de Cargo Superior", [
+        `Acao: falha ao enviar solicitacao na DM do owner`,
+        `Usuario: ${member.user.tag}`,
+        `ID do usuario: ${member.id}`,
+        `Cargo solicitado: ${HIGHER_THAN_MAX_ROLE.roleId}`,
+        `Erro: ${error instanceof Error ? error.message : "erro desconhecido"}`
+      ]);
+
+      return {
+        ok: false,
+        message: "⚠️ Não consegui enviar sua solicitação na DM do owner. Verifique se ele permite mensagens privadas do bot."
+      };
+    }
   }
 
   async handleHigherRoleApproval(interaction: ButtonInteraction, approved: boolean, guildId: string, userId: string) {
@@ -489,12 +495,11 @@ export class LevelService {
       }
 
       const member = await guild.members.fetch(userId);
-      const channel = await this.fetchAnnouncementChannel(guild, pendingRequest.channelId);
 
       if (!approved) {
         pendingHigherRoleRequests.delete(requestKey);
         await interaction.reply("❌ Solicitação de cargo superior reprovada.");
-        await channel?.send(`${member.displayName}, sua solicitação de cargo superior não foi aprovada neste momento.`);
+        await this.notifyMember(member, "Sua solicitação de cargo superior não foi aprovada neste momento.");
         return;
       }
 
@@ -514,7 +519,7 @@ export class LevelService {
 
       pendingHigherRoleRequests.delete(requestKey);
       await interaction.reply("✅ Solicitação de cargo superior aprovada.");
-      await channel?.send(`🎉 ${member.displayName}, sua solicitação foi aprovada e você recebeu o cargo superior.`);
+      await this.notifyMember(member, "Sua solicitação foi aprovada e você recebeu o cargo superior.");
     } catch (error) {
       console.error("Erro ao processar aprovacao de cargo superior:", error);
 
@@ -576,6 +581,40 @@ export class LevelService {
       ok: true,
       reason: "cargo aplicado."
     };
+  }
+
+  private async sendOwnerApprovalRequest(
+    member: GuildMember,
+    request: {
+      content: string;
+      approveCustomId: string;
+      rejectCustomId: string;
+    }
+  ) {
+    const owner = await member.guild.fetchOwner();
+    const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(request.approveCustomId)
+        .setLabel("Aprovar")
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(request.rejectCustomId)
+        .setLabel("Reprovar")
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await owner.send({
+      content: request.content,
+      components: [actionRow]
+    });
+  }
+
+  private async notifyMember(member: GuildMember, message: string) {
+    try {
+      await member.send(message);
+    } catch (error) {
+      console.error("Erro ao enviar DM para usuario sobre aprovacao de cargo:", error);
+    }
   }
 
   private async fetchAnnouncementChannel(guild: Guild, channelId: string) {

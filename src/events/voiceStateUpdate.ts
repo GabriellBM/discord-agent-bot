@@ -36,14 +36,6 @@ export async function execute(oldState: VoiceState, newState: VoiceState) {
       changes.push(`Surdez do servidor: ${newState.serverDeaf ? "ativada" : "desativada"}`);
     }
 
-    if (oldState.selfMute !== newState.selfMute) {
-      changes.push(`Auto mute: ${newState.selfMute ? "ativado" : "desativado"}`);
-    }
-
-    if (oldState.selfDeaf !== newState.selfDeaf) {
-      changes.push(`Auto surdez: ${newState.selfDeaf ? "ativada" : "desativada"}`);
-    }
-
     if (oldState.streaming !== newState.streaming) {
       changes.push(`Transmissao: ${newState.streaming ? "iniciada" : "encerrada"}`);
     }

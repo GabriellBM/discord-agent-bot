@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import { AUTOMOD_CONFIG } from "../config/automod.config";
 import { AutomodRule, findForbiddenWord, getModerationRuleForMember, isUserImmune } from "../utils/automod.util";
+import { fetchPublicBotChannel } from "../utils/bot-channel.util";
 import { LevelService } from "./level.service";
 import { LogService } from "./log.service";
 import { OpenAIModerationResult, OpenAIModerationService } from "./openai-moderation.service";
@@ -113,8 +114,10 @@ export class AutomodService {
       const removedRoles = await this.levelService.removeInvalidLevelRoles(member, updatedLevelData.level);
       rolesRemoved = removedRoles.length > 0;
 
-      if (rolesRemoved && "send" in message.channel) {
-        await message.channel.send(
+      const publicBotChannel = await fetchPublicBotChannel(message.guild, message.channel.id);
+
+      if (rolesRemoved && publicBotChannel) {
+        await publicBotChannel.send(
           `⚠️ ${member}, você perdeu o(s) cargo(s) ${removedRoles.join(", ")} por queda nos pontos.`
         );
       }
@@ -124,12 +127,14 @@ export class AutomodService {
       timeoutApplied = await this.applyTimeout(member, rule.timeoutMinutes);
     }
 
-    if ("send" in message.channel) {
+    const publicBotChannel = await fetchPublicBotChannel(message.guild, message.channel.id);
+
+    if (publicBotChannel) {
       const publicMessage = analysis.isSevere
         ? `🚨 ${member}, sua mensagem foi detectada como violação grave das regras. Você perdeu ${rule.xpPenalty} XP.`
         : `⚠️ ${member}, sua mensagem violou as regras. Você perdeu ${rule.xpPenalty} XP.`;
 
-      await message.channel.send(publicMessage);
+      await publicBotChannel.send(publicMessage);
     }
 
     await this.sendAutomodLog(message.guild, {
@@ -149,25 +154,19 @@ export class AutomodService {
   }
 
   async sendAutomodLog(guild: Guild, payload: AutomodLogPayload) {
-    await this.logService.send(guild, "🛡️ Log de Automod", [
+    await this.logService.send(guild, "Automod", [
       `Origem: ${payload.localMatch ? "lista local + automod" : "OpenAI Moderation API"}`,
-      `Lista local: ${payload.localMatch ? `sim (${payload.localMatch})` : "não"}`,
-      `Usuário: ${payload.member.user.tag}`,
-      `ID do usuário: ${payload.member.id}`,
+      `Usuario: ${payload.member.user.tag}`,
+      `ID do usuario: ${payload.member.id}`,
       `Canal: <#${payload.channelId}>`,
-      `Mensagem original: ${payload.messageContent}`,
-      `Sucesso da API: ${payload.analysis.success ? "sim" : "não"}`,
-      `Erro da API: ${payload.analysis.error ?? "nenhum"}`,
-      `Flagged: ${payload.analysis.flagged ? "sim" : "não"}`,
-      `Score máximo: ${formatScore(payload.analysis.maxScore)}`,
-      `Categoria principal: ${payload.analysis.detectedCategory ?? "nenhuma"}`,
-      `Categorias marcadas: ${formatFlaggedCategories(payload.analysis.categories)}`,
-      `Scores por categoria: ${formatScores(payload.analysis.categoryScores)}`,
-      `Severo: ${payload.analysis.isSevere ? "sim" : "não"}`,
-      `Mensagem deletada: ${payload.messageDeleted ? "sim" : "não"}`,
+      `Motivo: ${payload.localMatch ?? payload.analysis.detectedCategory ?? "moderacao automatica"}`,
+      `Gravidade: ${payload.analysis.isSevere ? "severa" : "normal"}`,
+      `Mensagem deletada: ${payload.messageDeleted ? "sim" : "nao"}`,
       `XP removido: ${payload.xpRemoved}`,
-      `Timeout aplicado: ${payload.timeoutApplied ? "sim" : "não"}`,
-      `Cargos removidos: ${payload.rolesRemoved ? "sim" : "não"}`
+      `Timeout aplicado: ${payload.timeoutApplied ? "sim" : "nao"}`,
+      `Cargos removidos: ${payload.rolesRemoved ? "sim" : "nao"}`,
+      `Conteudo: ${payload.messageContent}`,
+      `Erro: ${payload.analysis.error ?? "nenhum"}`
     ]);
   }
 
@@ -256,26 +255,4 @@ function getDefaultRule(isSevere: boolean): AutomodRule {
       : AUTOMOD_CONFIG.moderation.timeoutMinutes,
     deleteMessage: AUTOMOD_CONFIG.deleteMessage
   };
-}
-
-function formatScore(score: number) {
-  return score.toFixed(3);
-}
-
-function formatScores(scores: Record<string, number>) {
-  const entries = Object.entries(scores);
-
-  if (entries.length === 0) {
-    return "nenhum";
-  }
-
-  return entries.map(([key, value]) => `${key}: ${formatScore(value)}`).join(", ");
-}
-
-function formatFlaggedCategories(categories: Record<string, boolean>) {
-  const flaggedCategories = Object.entries(categories)
-    .filter(([, flagged]) => flagged)
-    .map(([category]) => category);
-
-  return flaggedCategories.length > 0 ? flaggedCategories.join(", ") : "nenhuma";
 }

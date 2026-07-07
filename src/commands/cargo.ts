@@ -25,11 +25,11 @@ export const execute: Command["execute"] = async (interaction) => {
       return;
     }
 
-    await levelService.requestHigherRoleApproval(
+    const requestResult = await levelService.requestHigherRoleApproval(
       member,
       interaction.channel as GuildTextBasedChannel
     );
-    await interaction.editReply("📨 Sua solicitação foi enviada no chat para aprovação do owner.");
+    await interaction.editReply(requestResult.message);
   } catch (error) {
     console.error("Erro ao executar /cargo solicitar:", error);
     await interaction.editReply("⚠️ Não consegui enviar sua solicitação agora.");

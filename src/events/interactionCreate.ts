@@ -1,4 +1,5 @@
 import { Events, Interaction } from "discord.js";
+import { env } from "../config/env";
 import { LevelService } from "../services/level.service";
 import { musicService } from "../services/music.service";
 import { MusicVoteType } from "../types/music.types";
@@ -44,6 +45,16 @@ export async function execute(interaction: Interaction) {
 
   if (!interaction.isChatInputCommand()) {
     return;
+  }
+
+  if (env.botInteractionChannelId && interaction.guild && interaction.user.id !== interaction.guild.ownerId) {
+    if (interaction.channelId !== env.botInteractionChannelId) {
+      await interaction.reply({
+        content: `Use os comandos do bot apenas em <#${env.botInteractionChannelId}>.`,
+        ephemeral: true
+      });
+      return;
+    }
   }
 
   const command = interaction.client.commands.get(interaction.commandName);

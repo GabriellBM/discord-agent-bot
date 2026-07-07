@@ -26,6 +26,7 @@ import path from "node:path";
 import ytdl from "@distube/ytdl-core";
 import play from "play-dl";
 import { GuildMusicState, LoopMode, MusicVoteType, Track } from "../types/music.types";
+import { fetchPublicBotChannel } from "../utils/bot-channel.util";
 
 type MusicAction = () => Promise<void>;
 
@@ -38,7 +39,7 @@ export class MusicService {
   private readonly states = new Map<string, GuildMusicState>();
 
   async play(interaction: ChatInputCommandInteraction, url: string) {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     try {
       const context = await this.getVoiceContext(interaction);
@@ -306,7 +307,7 @@ export class MusicService {
     force: boolean,
     action: MusicAction
   ) {
-    await interaction.deferReply({ ephemeral: force });
+    await interaction.deferReply({ ephemeral: true });
 
     const validation = await this.validateMusicAction(interaction, type !== "leave");
 
@@ -334,16 +335,25 @@ export class MusicService {
       return;
     }
 
+    const publicBotChannel = await fetchPublicBotChannel(interaction.guild!, interaction.channelId);
+
+    if (!publicBotChannel) {
+      await interaction.editReply({ embeds: [this.errorEmbed("NÃ£o consegui encontrar o canal de interaÃ§Ã£o do bot.")] });
+      return;
+    }
+
     const requiredVotes = await this.getRequiredVotes(interaction.guild!, state.voiceChannelId!);
-    const reply = await interaction.editReply({
+    const reply = await publicBotChannel.send({
       embeds: [this.voteEmbed(type, 0, 0, requiredVotes)],
       components: [this.voteButtons(interaction.guildId!, type)]
     });
 
+    await interaction.editReply({ embeds: [this.successEmbed(`VotaÃ§Ã£o aberta em ${publicBotChannel}.`)] });
+
     state.vote = {
       type,
       messageId: reply.id,
-      channelId: interaction.channelId,
+      channelId: publicBotChannel.id,
       voiceChannelId: state.voiceChannelId!,
       yesVotes: new Set<string>(),
       noVotes: new Set<string>(),
@@ -747,13 +757,7 @@ export class MusicService {
     const state = this.states.get(guildId);
 
     try {
-      const channel = await state?.guild?.channels.fetch(channelId);
-
-      if (channel?.isTextBased() && "send" in channel) {
-        return channel;
-      }
-
-      return null;
+      return state?.guild ? fetchPublicBotChannel(state.guild, channelId) : null;
     } catch (error) {
       console.error("Erro ao buscar canal de texto de música:", error);
       return null;

@@ -1,4 +1,4 @@
-import { GuildTextBasedChannel, SlashCommandBuilder } from "discord.js";
+import { GuildMember, GuildTextBasedChannel, SlashCommandBuilder } from "discord.js";
 import { LevelService } from "../services/level.service";
 import { LogService } from "../services/log.service";
 import type { Command } from "../types/Command";
@@ -102,7 +102,7 @@ export const execute: Command["execute"] = async (interaction) => {
           interaction.channel as GuildTextBasedChannel
         );
       }
-      await notifyRemovedRoles(interaction, user.toString(), removedRoles);
+      await notifyRemovedRoles(member, removedRoles);
       await logService.send(interaction.guild, "Log de XP Manual", [
         `Executor: ${interaction.user.tag}`,
         `Usuario: ${user.tag}`,
@@ -119,7 +119,7 @@ export const execute: Command["execute"] = async (interaction) => {
     if (subcommand === "reset") {
       const data = await levelService.resetUserLevel(interaction.guild.id, user.id);
       const removedRoles = await levelService.removeInvalidLevelRoles(member, data.level);
-      await notifyRemovedRoles(interaction, user.toString(), removedRoles);
+      await notifyRemovedRoles(member, removedRoles);
       await logService.send(interaction.guild, "Log de XP Manual", [
         `Executor: ${interaction.user.tag}`,
         `Usuario: ${user.tag}`,
@@ -147,7 +147,7 @@ export const execute: Command["execute"] = async (interaction) => {
 
     if (data.level < previousLevel) {
       const removedRoles = await levelService.removeInvalidLevelRoles(member, data.level);
-      await notifyRemovedRoles(interaction, user.toString(), removedRoles);
+      await notifyRemovedRoles(member, removedRoles);
     } else {
       await levelService.applyLevelRoles(member, data.level);
       if (interaction.channel?.isTextBased()) {
@@ -170,13 +170,11 @@ export const execute: Command["execute"] = async (interaction) => {
       `XP atual: ${data.xp}/${levelService.getRequiredXp(data.level)}`
     ]);
 
-    if (data.level > previousLevel && interaction.channel && "send" in interaction.channel) {
+    if (data.level > previousLevel) {
       try {
-        await interaction.channel.send(
-          `🎉 Parabéns, ${user}! Você subiu para o nível ${data.level}.`
-        );
+        await member.send(`🎉 Parabéns! Você subiu para o nível ${data.level}.`);
       } catch (error) {
-        console.error("Nao foi possivel enviar mensagem de level up manual:", error);
+        console.error("Nao foi possivel enviar DM de level up manual:", error);
       }
     }
 
@@ -193,19 +191,16 @@ export const execute: Command["execute"] = async (interaction) => {
 };
 
 async function notifyRemovedRoles(
-  interaction: Parameters<Command["execute"]>[0],
-  userMention: string,
+  member: GuildMember,
   removedRoles: unknown[]
 ) {
-  if (removedRoles.length === 0 || !interaction.channel || !("send" in interaction.channel)) {
+  if (removedRoles.length === 0) {
     return;
   }
 
   try {
-    await interaction.channel.send(
-      `⚠️ ${userMention} perdeu o(s) cargo(s) ${removedRoles.join(", ")} por queda nos pontos.`
-    );
+    await member.send(`⚠️ Você perdeu o(s) cargo(s) ${removedRoles.join(", ")} por queda nos pontos.`);
   } catch (error) {
-    console.error("Nao foi possivel enviar aviso de perda de cargo:", error);
+    console.error("Nao foi possivel enviar DM de perda de cargo:", error);
   }
 }

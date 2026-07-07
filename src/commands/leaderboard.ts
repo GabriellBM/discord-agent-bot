@@ -18,9 +18,7 @@ export const execute: Command["execute"] = async (interaction) => {
       return;
     }
 
-    const isOwner = interaction.user.id === interaction.guild.ownerId;
-
-    await interaction.deferReply({ ephemeral: !isOwner });
+    await interaction.deferReply({ ephemeral: true });
 
     const leaderboard = await levelService.getLeaderboard(interaction.guild, 10);
 

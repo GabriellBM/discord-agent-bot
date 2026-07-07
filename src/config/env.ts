@@ -12,6 +12,7 @@ export const env = {
   discordToken: process.env.DISCORD_TOKEN as string,
   clientId: process.env.DISCORD_CLIENT_ID as string,
   guildId: process.env.DISCORD_GUILD_ID,
+  botInteractionChannelId: process.env.BOT_INTERACTION_CHANNEL_ID,
   openaiApiKey: process.env.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL ?? "gpt-4.1-mini"
 };

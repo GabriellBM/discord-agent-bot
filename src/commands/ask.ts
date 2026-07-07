@@ -18,7 +18,7 @@ export const command: Command = {
   async execute(interaction) {
     const question = interaction.options.getString("pergunta", true);
 
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     try {
       const openAIService = new OpenAIService();
