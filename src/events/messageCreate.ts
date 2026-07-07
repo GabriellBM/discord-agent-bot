@@ -19,6 +19,13 @@ export async function execute(message: Message) {
 
     const member = message.member ?? (await message.guild.members.fetch(message.author.id));
 
+    logService.writeToConsole("Log de Mensagem", [
+      `Autor: ${message.author.tag}`,
+      `ID do autor: ${message.author.id}`,
+      `Canal: <#${message.channel.id}>`,
+      `Conteudo: ${message.content || "[sem conteudo textual]"}`
+    ]);
+
     const handledByAutomod = await automodService.handleMessage(message);
 
     if (handledByAutomod) {
@@ -29,6 +36,15 @@ export async function execute(message: Message) {
 
     if (!result.onCooldown) {
       await levelService.applyLevelRoles(member, result.data.level);
+      logService.writeToConsole("Log de XP", [
+        `Usuario: ${message.author.tag}`,
+        `ID do usuario: ${message.author.id}`,
+        `Canal: <#${message.channel.id}>`,
+        `Acao: ganhou XP por mensagem`,
+        `XP ganho: ${result.gainedXp}`,
+        `Nivel atual: ${result.data.level}`,
+        `XP atual: ${result.data.xp}/${levelService.getRequiredXp(result.data.level)}`
+      ]);
     }
 
     if (!result.leveledUp) {

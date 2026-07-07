@@ -1,4 +1,5 @@
-import { Client, EmbedBuilder, Events } from "discord.js";
+import { Client, Events } from "discord.js";
+import packageJson from "../../package.json";
 import { env } from "../config/env";
 import { fetchPublicBotChannel } from "../utils/bot-channel.util";
 
@@ -68,40 +69,37 @@ async function announceBotReady(client: Client<true>) {
     .filter((command) => client.commands.has(command.name))
     .map((command) => `/${command.name} - ${command.summary}`);
 
-  const embed = new EmbedBuilder()
-    .setTitle("Pronto para ajudar")
-    .setDescription([
-      "Oi! Estou online e pronto para atender por aqui.",
-      "Use este canal para comandos do bot sem espalhar mensagens pelo servidor."
-    ].join("\n"))
-    .setColor(0x57f287)
-    .addFields(
-      {
-        name: "Comandos publicos",
-        value: commandLines.join("\n") || "Nenhum comando publico disponivel no momento."
-      },
-      {
-        name: "Sistema de XP",
-        value: [
-          "• Ganhe XP participando das conversas do servidor.",
-          "• Ao acumular XP suficiente, voce sobe de nivel.",
-          "• Cargos de nivel podem ser liberados automaticamente.",
-          "• Cargos especiais precisam de aprovacao do owner no privado."
-        ].join("\n")
-      },
-      {
-        name: "Regras do servidor",
-        value: [
-          "• Respeite os outros membros.",
-          "• Evite ofensas, assedio, preconceito e provocacoes.",
-          "• Nao envie spam, flood ou conteudo perigoso.",
-          "• Use este canal para comandos do bot.",
-          "• Violacoes podem causar perda de XP e moderacao automatica."
-        ].join("\n")
-      }
-    )
-    .setFooter({ text: "Obrigado por manter o servidor organizado." })
-    .setTimestamp();
+  const message = [
+    "@everyone",
+    "",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    `BOT ONLINE | v${packageJson.version}`,
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "Oi! Estou online e pronto para atender por aqui.",
+    "Use este canal para comandos do bot sem espalhar mensagens pelo servidor.",
+    "",
+    "COMANDOS PUBLICOS",
+    commandLines.join("\n") || "Nenhum comando publico disponivel no momento.",
+    "",
+    "SISTEMA DE XP",
+    "- Ganhe XP participando das conversas do servidor.",
+    "- Ao acumular XP suficiente, voce sobe de nivel.",
+    "- Cargos de nivel podem ser liberados automaticamente.",
+    "- Cargos especiais precisam de aprovacao do owner no privado.",
+    "",
+    "REGRAS DO SERVIDOR",
+    "- Respeite os outros membros.",
+    "- Evite ofensas, assedio, preconceito e provocacoes.",
+    "- Nao envie spam, flood ou conteudo perigoso.",
+    "- Use este canal para comandos do bot.",
+    "- Violacoes podem causar perda de XP e moderacao automatica.",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  ].join("\n");
 
-  await channel.send({ embeds: [embed] });
+  await channel.send({
+    content: message,
+    allowedMentions: {
+      parse: ["everyone"]
+    }
+  });
 }

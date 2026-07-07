@@ -18,40 +18,85 @@ export async function execute(oldState: VoiceState, newState: VoiceState) {
       return;
     }
 
-    const changes: string[] = [];
+    const consoleChanges: string[] = [];
+    const discordChanges: string[] = [];
+    const channel = newState.channel ?? oldState.channel;
+    const stateForDisplay = newState.channelId ? newState : oldState;
 
     if (!oldState.channelId && newState.channelId) {
-      changes.push(`Entrou no canal de voz: <#${newState.channelId}>`);
+      consoleChanges.push("Entrou no canal de voz");
+      discordChanges.push("Entrou no canal de voz");
     } else if (oldState.channelId && !newState.channelId) {
-      changes.push(`Saiu do canal de voz: <#${oldState.channelId}>`);
+      consoleChanges.push("Saiu do canal de voz");
+      discordChanges.push("Saiu do canal de voz");
     } else if (oldState.channelId !== newState.channelId) {
-      changes.push(`Moveu de <#${oldState.channelId}> para <#${newState.channelId}>`);
+      const moveAction = `Moveu de ${oldState.channel?.name ?? "canal desconhecido"} para ${newState.channel?.name ?? "canal desconhecido"}`;
+      consoleChanges.push(moveAction);
+      discordChanges.push(moveAction);
     }
 
     if (oldState.serverMute !== newState.serverMute) {
-      changes.push(`Mute do servidor: ${newState.serverMute ? "ativado" : "desativado"}`);
+      const serverMuteAction = `Mute do servidor: ${newState.serverMute ? "ativado" : "desativado"}`;
+      consoleChanges.push(serverMuteAction);
+      discordChanges.push(serverMuteAction);
     }
 
     if (oldState.serverDeaf !== newState.serverDeaf) {
-      changes.push(`Surdez do servidor: ${newState.serverDeaf ? "ativada" : "desativada"}`);
+      const serverDeafAction = `Surdez do servidor: ${newState.serverDeaf ? "ativada" : "desativada"}`;
+      consoleChanges.push(serverDeafAction);
+      discordChanges.push(serverDeafAction);
+    }
+
+    if (oldState.selfMute !== newState.selfMute) {
+      consoleChanges.push(`Auto mute: ${newState.selfMute ? "ativado" : "desativado"}`);
+    }
+
+    if (oldState.selfDeaf !== newState.selfDeaf) {
+      consoleChanges.push(`Auto surdez: ${newState.selfDeaf ? "ativada" : "desativada"}`);
     }
 
     if (oldState.streaming !== newState.streaming) {
-      changes.push(`Transmissao: ${newState.streaming ? "iniciada" : "encerrada"}`);
+      const streamingAction = `Transmissao: ${newState.streaming ? "iniciada" : "encerrada"}`;
+      consoleChanges.push(streamingAction);
+      discordChanges.push(streamingAction);
     }
 
     if (oldState.selfVideo !== newState.selfVideo) {
-      changes.push(`Camera: ${newState.selfVideo ? "ativada" : "desativada"}`);
+      const videoAction = `Camera: ${newState.selfVideo ? "ativada" : "desativada"}`;
+      consoleChanges.push(videoAction);
+      discordChanges.push(videoAction);
     }
 
-    if (changes.length === 0) {
+    if (consoleChanges.length === 0) {
+      return;
+    }
+
+    const logLines = [
+      `Usuario: ${member.displayName}`,
+      `ID do usuario: ${member.id}`,
+      `Canal: ${channel?.name ?? "canal desconhecido"}`,
+      `Acao: ${consoleChanges.join("; ")}`,
+      `Microfone: ${stateForDisplay.selfMute ? "Desativado" : "Ativado"}`,
+      `Audio: ${stateForDisplay.selfDeaf ? "Desativado" : "Ativado"}`,
+      `Camera: ${stateForDisplay.selfVideo ? "Ativada" : "Desativada"}`,
+      `Transmissao: ${stateForDisplay.streaming ? "Ativada" : "Desativada"}`
+    ];
+
+    logService.writeToConsole("Log de Voz", logLines);
+
+    if (discordChanges.length === 0) {
       return;
     }
 
     await logService.send(guild, "Log de Voz", [
-      `Usuario: ${member.user.tag}`,
+      `Usuario: ${member.displayName}`,
       `ID do usuario: ${member.id}`,
-      `Acao: ${changes.join("; ")}`
+      `Canal: ${channel?.name ?? "canal desconhecido"}`,
+      `Acao: ${discordChanges.join("; ")}`,
+      `Microfone: ${stateForDisplay.selfMute ? "Desativado" : "Ativado"}`,
+      `Audio: ${stateForDisplay.selfDeaf ? "Desativado" : "Ativado"}`,
+      `Camera: ${stateForDisplay.selfVideo ? "Ativada" : "Desativada"}`,
+      `Transmissao: ${stateForDisplay.streaming ? "Ativada" : "Desativada"}`
     ]);
   } catch (error) {
     console.error("Erro ao registrar evento de voz:", error);
