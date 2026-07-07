@@ -2,6 +2,10 @@ FROM node:24-bookworm-slim AS build
 
 WORKDIR /app
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates python3 \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 RUN npm ci
 
@@ -16,6 +20,10 @@ ENV NODE_ENV=production
 ENV LEVELS_FILE_PATH=/app/data/levels.json
 
 WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates python3 \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 COPY --from=build /app/node_modules ./node_modules
