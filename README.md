@@ -257,13 +257,17 @@ Suba o bot:
 npm run docker:up
 ```
 
-A imagem gerada pelo Compose usa o nome e a versao do `package.json`:
+A imagem gerada pelo Compose usa os valores padrao do `docker-compose.yml`:
 
 ```text
 discord-agent-bot:v1.1.0
 ```
 
-Se preferir rodar `docker compose up -d --build` diretamente, o Compose usa os valores padrao definidos no `docker-compose.yml`.
+Voce tambem pode sobrescrever a imagem com variaveis de ambiente:
+
+```bash
+PROJECT_NAME=discord-agent-bot APP_VERSION=1.1.0 docker compose up -d --build
+```
 
 Ver logs em tempo real:
 
