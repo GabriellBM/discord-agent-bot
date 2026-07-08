@@ -1,8 +1,6 @@
 import { Events, VoiceState } from "discord.js";
-import { LogService } from "../services/log.service";
 import { musicService } from "../services/music.service";
-
-const logService = new LogService();
+import { logger } from "../utils/logger";
 
 export const name = Events.VoiceStateUpdate;
 export const once = false;
@@ -18,87 +16,107 @@ export async function execute(oldState: VoiceState, newState: VoiceState) {
       return;
     }
 
-    const consoleChanges: string[] = [];
-    const discordChanges: string[] = [];
-    const channel = newState.channel ?? oldState.channel;
-    const stateForDisplay = newState.channelId ? newState : oldState;
-
     if (!oldState.channelId && newState.channelId) {
-      consoleChanges.push("Entrou no canal de voz");
-      discordChanges.push("Entrou no canal de voz");
+      logger.info("VOICE", "JOIN", {
+        user: member.displayName,
+        userId: member.id,
+        channel: newState.channel?.name,
+        channelId: newState.channelId,
+        guild: guild.name,
+        microphone: !newState.selfMute,
+        audio: !newState.selfDeaf,
+        camera: newState.selfVideo,
+        streaming: newState.streaming
+      });
     } else if (oldState.channelId && !newState.channelId) {
-      consoleChanges.push("Saiu do canal de voz");
-      discordChanges.push("Saiu do canal de voz");
+      logger.info("VOICE", "LEAVE", {
+        user: member.displayName,
+        userId: member.id,
+        channel: oldState.channel?.name,
+        channelId: oldState.channelId,
+        guild: guild.name,
+        microphone: !oldState.selfMute,
+        audio: !oldState.selfDeaf,
+        camera: oldState.selfVideo,
+        streaming: oldState.streaming
+      });
     } else if (oldState.channelId !== newState.channelId) {
-      const moveAction = `Moveu de ${oldState.channel?.name ?? "canal desconhecido"} para ${newState.channel?.name ?? "canal desconhecido"}`;
-      consoleChanges.push(moveAction);
-      discordChanges.push(moveAction);
+      logger.info("VOICE", "MOVE", {
+        user: member.displayName,
+        userId: member.id,
+        from: oldState.channel?.name,
+        to: newState.channel?.name,
+        guild: guild.name,
+        microphone: !newState.selfMute,
+        audio: !newState.selfDeaf,
+        camera: newState.selfVideo,
+        streaming: newState.streaming
+      });
     }
 
     if (oldState.serverMute !== newState.serverMute) {
-      const serverMuteAction = `Mute do servidor: ${newState.serverMute ? "ativado" : "desativado"}`;
-      consoleChanges.push(serverMuteAction);
-      discordChanges.push(serverMuteAction);
+      logger.info("VOICE", "SERVER_MUTE_CHANGED", {
+        user: member.displayName,
+        userId: member.id,
+        channel: newState.channel?.name ?? oldState.channel?.name,
+        guild: guild.name,
+        serverMute: newState.serverMute
+      });
     }
 
     if (oldState.serverDeaf !== newState.serverDeaf) {
-      const serverDeafAction = `Surdez do servidor: ${newState.serverDeaf ? "ativada" : "desativada"}`;
-      consoleChanges.push(serverDeafAction);
-      discordChanges.push(serverDeafAction);
+      logger.info("VOICE", "SERVER_DEAF_CHANGED", {
+        user: member.displayName,
+        userId: member.id,
+        channel: newState.channel?.name ?? oldState.channel?.name,
+        guild: guild.name,
+        serverDeaf: newState.serverDeaf
+      });
     }
 
     if (oldState.selfMute !== newState.selfMute) {
-      consoleChanges.push(`Auto mute: ${newState.selfMute ? "ativado" : "desativado"}`);
+      logger.info("VOICE", "MICROPHONE_CHANGED", {
+        user: member.displayName,
+        userId: member.id,
+        channel: newState.channel?.name ?? oldState.channel?.name,
+        guild: guild.name,
+        microphone: !newState.selfMute
+      });
     }
 
     if (oldState.selfDeaf !== newState.selfDeaf) {
-      consoleChanges.push(`Auto surdez: ${newState.selfDeaf ? "ativada" : "desativada"}`);
+      logger.info("VOICE", "AUDIO_CHANGED", {
+        user: member.displayName,
+        userId: member.id,
+        channel: newState.channel?.name ?? oldState.channel?.name,
+        guild: guild.name,
+        audio: !newState.selfDeaf
+      });
     }
 
     if (oldState.streaming !== newState.streaming) {
-      const streamingAction = `Transmissao: ${newState.streaming ? "iniciada" : "encerrada"}`;
-      consoleChanges.push(streamingAction);
-      discordChanges.push(streamingAction);
+      logger.info("VOICE", "STREAMING_CHANGED", {
+        user: member.displayName,
+        userId: member.id,
+        channel: newState.channel?.name ?? oldState.channel?.name,
+        guild: guild.name,
+        streaming: newState.streaming
+      });
     }
 
     if (oldState.selfVideo !== newState.selfVideo) {
-      const videoAction = `Camera: ${newState.selfVideo ? "ativada" : "desativada"}`;
-      consoleChanges.push(videoAction);
-      discordChanges.push(videoAction);
+      logger.info("VOICE", "CAMERA_CHANGED", {
+        user: member.displayName,
+        userId: member.id,
+        channel: newState.channel?.name ?? oldState.channel?.name,
+        guild: guild.name,
+        camera: newState.selfVideo
+      });
     }
-
-    if (consoleChanges.length === 0) {
-      return;
-    }
-
-    const logLines = [
-      `Usuario: ${member.displayName}`,
-      `ID do usuario: ${member.id}`,
-      `Canal: ${channel?.name ?? "canal desconhecido"}`,
-      `Acao: ${consoleChanges.join("; ")}`,
-      `Microfone: ${stateForDisplay.selfMute ? "Desativado" : "Ativado"}`,
-      `Audio: ${stateForDisplay.selfDeaf ? "Desativado" : "Ativado"}`,
-      `Camera: ${stateForDisplay.selfVideo ? "Ativada" : "Desativada"}`,
-      `Transmissao: ${stateForDisplay.streaming ? "Ativada" : "Desativada"}`
-    ];
-
-    logService.writeToConsole("Log de Voz", logLines);
-
-    if (discordChanges.length === 0) {
-      return;
-    }
-
-    await logService.send(guild, "Log de Voz", [
-      `Usuario: ${member.displayName}`,
-      `ID do usuario: ${member.id}`,
-      `Canal: ${channel?.name ?? "canal desconhecido"}`,
-      `Acao: ${discordChanges.join("; ")}`,
-      `Microfone: ${stateForDisplay.selfMute ? "Desativado" : "Ativado"}`,
-      `Audio: ${stateForDisplay.selfDeaf ? "Desativado" : "Ativado"}`,
-      `Camera: ${stateForDisplay.selfVideo ? "Ativada" : "Desativada"}`,
-      `Transmissao: ${stateForDisplay.streaming ? "Ativada" : "Desativada"}`
-    ]);
   } catch (error) {
-    console.error("Erro ao registrar evento de voz:", error);
+    logger.error("VOICE", "VOICE_EVENT_FAILED", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
   }
 }

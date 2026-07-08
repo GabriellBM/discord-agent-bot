@@ -1,5 +1,6 @@
 import { Guild, GuildTextBasedChannel } from "discord.js";
 import { env } from "../config/env";
+import { logger } from "./logger";
 
 export async function fetchPublicBotChannel(guild: Guild, fallbackChannelId?: string) {
   const channelId = env.botInteractionChannelId ?? fallbackChannelId;
@@ -17,7 +18,12 @@ export async function fetchPublicBotChannel(guild: Guild, fallbackChannelId?: st
 
     return null;
   } catch (error) {
-    console.error("Erro ao buscar canal publico do bot:", error);
+    logger.error("DISCORD", "CHANNEL_FETCH_FAILED", {
+      guild: guild.name,
+      channelId,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return null;
   }
 }

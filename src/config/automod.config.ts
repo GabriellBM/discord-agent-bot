@@ -42,8 +42,6 @@ export const AUTOMOD_CONFIG = {
 
   deleteMessage: true,
 
-  logChannelId: "1104041741830594572",
-
   forbiddenWords: [
     "vai tomar no cu",
     "vai se fuder",

@@ -1,5 +1,6 @@
 import { REST, Routes } from "discord.js";
 import { env } from "../config/env";
+import { logger } from "../utils/logger";
 import { loadCommands } from "./commandLoader";
 
 export async function registerCommands() {
@@ -11,12 +12,19 @@ export async function registerCommands() {
     await rest.put(Routes.applicationGuildCommands(env.clientId, env.guildId), {
       body: payload
     });
-    console.log(`${payload.length} comando(s) registrado(s) no servidor ${env.guildId}.`);
+    logger.success("DISCORD", "COMMANDS_REGISTERED", {
+      scope: "guild",
+      guildId: env.guildId,
+      commands: payload.length
+    });
     return;
   }
 
   await rest.put(Routes.applicationCommands(env.clientId), {
     body: payload
   });
-  console.log(`${payload.length} comando(s) global(is) registrado(s).`);
+  logger.success("DISCORD", "COMMANDS_REGISTERED", {
+    scope: "global",
+    commands: payload.length
+  });
 }

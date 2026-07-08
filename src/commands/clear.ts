@@ -1,10 +1,11 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import type { Command } from "../types/Command";
+import { logger } from "../utils/logger";
 import {
   checkBotPermission,
   checkUserPermission,
   moderationPermissions
 } from "../utils/permission.util";
-import type { Command } from "../types/Command";
 
 export const data = new SlashCommandBuilder()
   .setName("clear")
@@ -24,7 +25,7 @@ export const execute: Command["execute"] = async (interaction) => {
 
   try {
     if (!interaction.guild) {
-      await interaction.editReply("⚠️ Este comando só pode ser usado em um servidor.");
+      await interaction.editReply("Este comando so pode ser usado em um servidor.");
       return;
     }
 
@@ -39,17 +40,30 @@ export const execute: Command["execute"] = async (interaction) => {
     const channel = interaction.channel;
 
     if (!channel || !("bulkDelete" in channel)) {
-      await interaction.editReply("⚠️ Não consigo apagar mensagens neste canal.");
+      await interaction.editReply("Nao consigo apagar mensagens neste canal.");
       return;
     }
 
     const amount = interaction.options.getInteger("quantidade", true);
     const deletedMessages = await channel.bulkDelete(amount, true);
 
-    console.log(`${deletedMessages.size} mensagem(ns) apagada(s) por ${interaction.user.tag}.`);
-    await interaction.editReply(`🧹 ${deletedMessages.size} mensagem(ns) apagada(s).`);
+    logger.warn("MODERATION", "MESSAGES_BULK_DELETED", {
+      moderator: interaction.user.tag,
+      moderatorId: interaction.user.id,
+      channelId: interaction.channelId,
+      guild: interaction.guild.name,
+      requested: amount,
+      deleted: deletedMessages.size
+    });
+    await interaction.editReply(`${deletedMessages.size} mensagem(ns) apagada(s).`);
   } catch (error) {
-    console.error("Erro ao executar /clear:", error);
-    await interaction.editReply("⚠️ Não consegui apagar as mensagens. Verifique se elas não são antigas demais.");
+    logger.error("MODERATION", "CLEAR_FAILED", {
+      moderator: interaction.user.tag,
+      moderatorId: interaction.user.id,
+      channelId: interaction.channelId,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    await interaction.editReply("Nao consegui apagar as mensagens. Verifique se elas nao sao antigas demais.");
   }
 };

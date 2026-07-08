@@ -2,6 +2,7 @@ import { Client, Events } from "discord.js";
 import packageJson from "../../package.json";
 import { env } from "../config/env";
 import { fetchPublicBotChannel } from "../utils/bot-channel.util";
+import { logger } from "../utils/logger";
 
 const publicCommandSummaries = [
   {
@@ -34,18 +35,31 @@ const publicCommandSummaries = [
   }
 ];
 
+const patchNotes = [
+  "logger centralizado com eventos em uma linha para Portainer",
+  "logs de voz, musica, IA, moderacao, XP e sistema padronizados",
+  "canal de logs removido; observabilidade agora usa stdout do container",
+  "imagem Docker dinamica baseada em nome e versao do package.json"
+];
+
 export const name = Events.ClientReady;
 export const once = true;
 
 export async function execute(client: Client<true>) {
-  console.log(`Bot conectado como ${client.user.tag}`);
+  logger.success("DISCORD", "CONNECTED", {
+    bot: client.user.tag,
+    guilds: client.guilds.cache.size,
+    version: packageJson.version
+  });
 
   await announceBotReady(client);
 }
 
 async function announceBotReady(client: Client<true>) {
   if (!env.botInteractionChannelId) {
-    console.log("Anuncio de inicializacao ignorado: BOT_INTERACTION_CHANNEL_ID nao configurado.");
+    logger.info("SYSTEM", "READY_ANNOUNCEMENT_SKIPPED", {
+      reason: "BOT_INTERACTION_CHANNEL_ID not configured"
+    });
     return;
   }
 
@@ -54,46 +68,43 @@ async function announceBotReady(client: Client<true>) {
     : client.guilds.cache.first();
 
   if (!guild) {
-    console.log("Anuncio de inicializacao ignorado: nenhum servidor encontrado.");
+    logger.warn("DISCORD", "READY_ANNOUNCEMENT_SKIPPED", {
+      reason: "guild not found"
+    });
     return;
   }
 
   const channel = await fetchPublicBotChannel(guild);
 
   if (!channel) {
-    console.log("Anuncio de inicializacao ignorado: canal de interacao nao encontrado.");
+    logger.warn("DISCORD", "READY_ANNOUNCEMENT_SKIPPED", {
+      reason: "interaction channel not found",
+      guild: guild.name
+    });
     return;
   }
 
   const commandLines = publicCommandSummaries
     .filter((command) => client.commands.has(command.name))
-    .map((command) => `/${command.name} - ${command.summary}`);
+    .map((command) => `INFO     [DISCORD]     COMMAND       name="/${command.name}" summary="${command.summary}"`);
+
+  const patchLines = patchNotes.map((note, index) => {
+    return `INFO     [SYSTEM]      PATCH_NOTE    version="v${packageJson.version}" item=${index + 1} change="${note}"`;
+  });
 
   const message = [
     "@everyone",
     "",
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    `BOT ONLINE | v${packageJson.version}`,
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    "Oi! Estou online e pronto para atender por aqui.",
-    "Use este canal para comandos do bot sem espalhar mensagens pelo servidor.",
-    "",
-    "COMANDOS PUBLICOS",
-    commandLines.join("\n") || "Nenhum comando publico disponivel no momento.",
-    "",
-    "SISTEMA DE XP",
-    "- Ganhe XP participando das conversas do servidor.",
-    "- Ao acumular XP suficiente, voce sobe de nivel.",
-    "- Cargos de nivel podem ser liberados automaticamente.",
-    "- Cargos especiais precisam de aprovacao do owner no privado.",
-    "",
-    "REGRAS DO SERVIDOR",
-    "- Respeite os outros membros.",
-    "- Evite ofensas, assedio, preconceito e provocacoes.",
-    "- Nao envie spam, flood ou conteudo perigoso.",
-    "- Use este canal para comandos do bot.",
-    "- Violacoes podem causar perda de XP e moderacao automatica.",
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    "```log",
+    `SUCCESS  [SYSTEM]      BOT_ONLINE    service="${packageJson.name}" version="v${packageJson.version}" bot="${client.user.tag}" guild="${guild.name}"`,
+    `INFO     [DISCORD]     COMMANDS      channel="${channel.toString()}" available=${commandLines.length}`,
+    ...patchLines,
+    ...(commandLines.length > 0
+      ? commandLines
+      : ['WARN     [DISCORD]     COMMANDS      reason="no public commands available"']),
+    'INFO     [MODERATION]  XP_SYSTEM     status="enabled" note="ganhe XP conversando; cargos por nivel continuam ativos"',
+    'INFO     [MODERATION]  RULES         summary="respeite membros; evite spam, ofensas e conteudo perigoso"',
+    "```"
   ].join("\n");
 
   await channel.send({

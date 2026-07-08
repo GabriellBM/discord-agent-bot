@@ -3,6 +3,7 @@ import { env } from "../config/env";
 import { LevelService } from "../services/level.service";
 import { musicService } from "../services/music.service";
 import { MusicVoteType } from "../types/music.types";
+import { logger } from "../utils/logger";
 
 const levelService = new LevelService();
 
@@ -70,7 +71,14 @@ export async function execute(interaction: Interaction) {
   try {
     await command.execute(interaction);
   } catch (error) {
-    console.error(`Erro ao executar /${interaction.commandName}:`, error);
+    logger.error("DISCORD", "COMMAND_FAILED", {
+      command: interaction.commandName,
+      user: interaction.user.tag,
+      userId: interaction.user.id,
+      channelId: interaction.channelId,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
 
     const response = {
       content: "⚠️ Ocorreu um erro ao executar este comando.",

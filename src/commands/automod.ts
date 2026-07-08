@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { AUTOMOD_CONFIG } from "../config/automod.config";
 import { AutomodService } from "../services/automod.service";
 import type { Command } from "../types/Command";
+import { logger } from "../utils/logger";
 
 const automodService = new AutomodService();
 
@@ -20,14 +21,14 @@ export const data = new SlashCommandBuilder()
       .addStringOption((option) =>
         option
           .setName("texto")
-          .setDescription("Texto que será testado.")
+          .setDescription("Texto que sera testado.")
           .setRequired(true)
       )
   )
   .addSubcommand((subcommand) =>
     subcommand
       .setName("logtest")
-      .setDescription("Envia uma mensagem de teste no canal de logs configurado.")
+      .setDescription("Gera um log de teste no stdout do bot.")
   );
 
 export const execute: Command["execute"] = async (interaction) => {
@@ -35,12 +36,12 @@ export const execute: Command["execute"] = async (interaction) => {
 
   try {
     if (!interaction.guild) {
-      await interaction.editReply("⚠️ Este comando só pode ser usado em um servidor.");
+      await interaction.editReply("Este comando so pode ser usado em um servidor.");
       return;
     }
 
     if (interaction.user.id !== interaction.guild.ownerId) {
-      await interaction.editReply("🚫 Apenas o dono do servidor pode usar este comando.");
+      await interaction.editReply("Apenas o dono do servidor pode usar este comando.");
       return;
     }
 
@@ -49,17 +50,17 @@ export const execute: Command["execute"] = async (interaction) => {
     if (subcommand === "status") {
       await interaction.editReply(
         [
-          "🛡️ Status do Automod",
-          `Automod ativo: ${AUTOMOD_CONFIG.enabled ? "sim" : "não"}`,
-          `OpenAI Moderation ativo: ${AUTOMOD_CONFIG.moderation.enabled ? "sim" : "não"}`,
+          "Status do Automod",
+          `Automod ativo: ${AUTOMOD_CONFIG.enabled ? "sim" : "nao"}`,
+          `OpenAI Moderation ativo: ${AUTOMOD_CONFIG.moderation.enabled ? "sim" : "nao"}`,
           `Modelo: ${AUTOMOD_CONFIG.moderation.model}`,
           `Palavras/frases locais: ${AUTOMOD_CONFIG.forbiddenWords.length}`,
           `Normal threshold: ${AUTOMOD_CONFIG.moderation.normalThreshold}`,
           `Severe threshold: ${AUTOMOD_CONFIG.moderation.severeThreshold}`,
-          `Canal de logs: ${AUTOMOD_CONFIG.logChannelId}`,
+          "Logs: stdout do container / Portainer",
           `Cargos imunes: ${AUTOMOD_CONFIG.ignoredRoleIds.length}`,
-          `Usuários imunes: ${AUTOMOD_CONFIG.ignoredUserIds.length}`,
-          `Regras de tolerância por cargo: ${AUTOMOD_CONFIG.roleToleranceRules.length}`
+          `Usuarios imunes: ${AUTOMOD_CONFIG.ignoredUserIds.length}`,
+          `Regras de tolerancia por cargo: ${AUTOMOD_CONFIG.roleToleranceRules.length}`
         ].join("\n")
       );
       return;
@@ -69,7 +70,7 @@ export const execute: Command["execute"] = async (interaction) => {
       const member = await interaction.guild.members.fetch(interaction.user.id);
 
       await automodService.sendTestLog(interaction.guild, member);
-      await interaction.editReply("✅ Teste de log enviado. Se não aparecer, confira o ID do canal e as permissões do bot.");
+      await interaction.editReply("Teste de log gerado no stdout do bot. Confira no Portainer.");
       return;
     }
 
@@ -80,25 +81,30 @@ export const execute: Command["execute"] = async (interaction) => {
 
     await interaction.editReply(
       [
-        "🧪 Teste do Automod com OpenAI Moderation API",
-        `Lista local: ${preview.localMatch ? `detectou "${preview.localMatch}"` : "não detectou"}`,
-        `API ativa: ${analysis.enabled ? "sim" : "não"}`,
-        `Sucesso da API: ${analysis.success ? "sim" : "não"}`,
+        "Teste do Automod com OpenAI Moderation API",
+        `Lista local: ${preview.localMatch ? `detectou "${preview.localMatch}"` : "nao detectou"}`,
+        `API ativa: ${analysis.enabled ? "sim" : "nao"}`,
+        `Sucesso da API: ${analysis.success ? "sim" : "nao"}`,
         `Erro da API: ${analysis.error ?? "nenhum"}`,
-        `Detectado: ${analysis.shouldPunish ? "sim" : "não"}`,
-        `Flagged: ${analysis.flagged ? "sim" : "não"}`,
-        `Score máximo: ${analysis.maxScore.toFixed(3)}`,
+        `Detectado: ${analysis.shouldPunish ? "sim" : "nao"}`,
+        `Flagged: ${analysis.flagged ? "sim" : "nao"}`,
+        `Score maximo: ${analysis.maxScore.toFixed(3)}`,
         `Categoria principal: ${analysis.detectedCategory ?? "nenhuma"}`,
         `Categorias marcadas: ${formatFlaggedCategories(analysis.categories)}`,
         `Scores por categoria: ${formatScores(analysis.categoryScores)}`,
-        `Punição: ${severity}`,
+        `Punicao: ${severity}`,
         `XP seria removido: ${analysis.shouldPunish ? preview.rule.xpPenalty : 0}`,
-        `Timeout seria aplicado: ${analysis.shouldPunish && preview.rule.timeoutMinutes > 0 ? `${preview.rule.timeoutMinutes} minuto(s)` : "não"}`
+        `Timeout seria aplicado: ${analysis.shouldPunish && preview.rule.timeoutMinutes > 0 ? `${preview.rule.timeoutMinutes} minuto(s)` : "nao"}`
       ].join("\n")
     );
   } catch (error) {
-    console.error("Erro ao executar /automod:", error);
-    await interaction.editReply("⚠️ Não consegui consultar o automod agora.");
+    logger.error("MODERATION", "AUTOMOD_COMMAND_FAILED", {
+      user: interaction.user.tag,
+      userId: interaction.user.id,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    await interaction.editReply("Nao consegui consultar o automod agora.");
   }
 };
 

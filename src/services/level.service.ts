@@ -21,6 +21,7 @@ import {
 } from "../config/level.config";
 import { env } from "../config/env";
 import { isUserImmune } from "../utils/automod.util";
+import { logger } from "../utils/logger";
 import { LogService } from "./log.service";
 
 export interface UserLevelData {
@@ -144,7 +145,12 @@ export class LevelService {
 
   async applyXpPenalty(member: GuildMember, amount = AUTOMOD_CONFIG.moderation.xpPenalty) {
     if (isUserImmune(member)) {
-      console.log("Usuario imune nao recebeu penalidade de XP.");
+      logger.info("MODERATION", "XP_PENALTY_SKIPPED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        reason: "user immune"
+      });
       return null;
     }
 
@@ -219,7 +225,12 @@ export class LevelService {
       const botMember = member.guild.members.me;
 
       if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-        console.log("Nao foi possivel aplicar cargos acumulativos de level: bot sem ManageRoles.");
+        logger.warn("MODERATION", "LEVEL_ROLES_SKIPPED", {
+          user: member.user.tag,
+          userId: member.id,
+          guild: member.guild.name,
+          reason: "missing ManageRoles permission"
+        });
         return;
       }
 
@@ -230,12 +241,23 @@ export class LevelService {
         const role = member.guild.roles.cache.get(roleConfig.roleId);
 
         if (!role) {
-          console.log(`Cargo de level nao encontrado: ${roleConfig.roleId}`);
+          logger.warn("MODERATION", "LEVEL_ROLE_NOT_FOUND", {
+            user: member.user.tag,
+            userId: member.id,
+            guild: member.guild.name,
+            roleId: roleConfig.roleId
+          });
           continue;
         }
 
         if (role.position >= botMember.roles.highest.position) {
-          console.log(`Cargo acumulativo de level acima ou igual ao cargo do bot: ${role.name}`);
+          logger.warn("MODERATION", "LEVEL_ROLE_SKIPPED", {
+            user: member.user.tag,
+            userId: member.id,
+            guild: member.guild.name,
+            role: role.name,
+            reason: "role position too high"
+          });
           continue;
         }
 
@@ -246,7 +268,13 @@ export class LevelService {
         await member.roles.add(role, "Cargo automatico acumulativo por level");
       }
     } catch (error) {
-      console.error("Erro ao aplicar cargos acumulativos de level:", error);
+      logger.error("MODERATION", "LEVEL_ROLES_FAILED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }
 
@@ -254,7 +282,12 @@ export class LevelService {
     const removedRoles: Role[] = [];
 
     if (isUserImmune(member)) {
-      console.log("Usuario imune: cargos por penalidade nao serao removidos.");
+      logger.info("MODERATION", "LEVEL_ROLE_REMOVAL_SKIPPED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        reason: "user immune"
+      });
       return removedRoles;
     }
 
@@ -262,7 +295,12 @@ export class LevelService {
       const botMember = member.guild.members.me;
 
       if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-        console.log("Nao foi possivel remover cargos invalidos de level: bot sem ManageRoles.");
+        logger.warn("MODERATION", "LEVEL_ROLE_REMOVAL_SKIPPED", {
+          user: member.user.tag,
+          userId: member.id,
+          guild: member.guild.name,
+          reason: "missing ManageRoles permission"
+        });
         return removedRoles;
       }
 
@@ -280,7 +318,13 @@ export class LevelService {
         }
 
         if (role.position >= botMember.roles.highest.position) {
-          console.log(`Cargo invalido de level acima ou igual ao cargo do bot: ${role.name}`);
+          logger.warn("MODERATION", "LEVEL_ROLE_REMOVAL_SKIPPED", {
+            user: member.user.tag,
+            userId: member.id,
+            guild: member.guild.name,
+            role: role.name,
+            reason: "role position too high"
+          });
           continue;
         }
 
@@ -290,7 +334,13 @@ export class LevelService {
 
       return removedRoles;
     } catch (error) {
-      console.error("Erro ao remover cargos invalidos de level:", error);
+      logger.error("MODERATION", "LEVEL_ROLE_REMOVAL_FAILED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return removedRoles;
     }
   }
@@ -335,7 +385,14 @@ export class LevelService {
       ]);
     } catch (error) {
       pendingMaxRoleRequests.delete(requestKey);
-      console.error("Erro ao enviar solicitacao de cargo maximo por DM:", error);
+      logger.error("MODERATION", "MAX_ROLE_REQUEST_FAILED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        level,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       await logService.send(member.guild, "Log de Cargo MAX", [
         `Acao: falha ao enviar solicitacao na DM do owner`,
         `Usuario: ${member.user.tag}`,
@@ -392,7 +449,14 @@ export class LevelService {
       await interaction.reply("✅ Solicitação de cargo máximo aprovada.");
       await this.notifyMember(member, "Sua conquista de nível máximo foi aprovada e você recebeu o cargo final.");
     } catch (error) {
-      console.error("Erro ao processar aprovacao de cargo maximo:", error);
+      logger.error("MODERATION", "MAX_ROLE_APPROVAL_FAILED", {
+        userId,
+        guildId,
+        moderator: interaction.user.tag,
+        moderatorId: interaction.user.id,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
 
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
@@ -456,7 +520,14 @@ export class LevelService {
       };
     } catch (error) {
       pendingHigherRoleRequests.delete(requestKey);
-      console.error("Erro ao enviar solicitacao de cargo superior por DM:", error);
+      logger.error("MODERATION", "HIGHER_ROLE_REQUEST_FAILED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        roleId: HIGHER_THAN_MAX_ROLE.roleId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       await logService.send(member.guild, "Log de Cargo Superior", [
         `Acao: falha ao enviar solicitacao na DM do owner`,
         `Usuario: ${member.user.tag}`,
@@ -522,7 +593,14 @@ export class LevelService {
       await interaction.reply("✅ Solicitação de cargo superior aprovada.");
       await this.notifyMember(member, "Sua solicitação foi aprovada e você recebeu o cargo superior.");
     } catch (error) {
-      console.error("Erro ao processar aprovacao de cargo superior:", error);
+      logger.error("MODERATION", "HIGHER_ROLE_APPROVAL_FAILED", {
+        userId,
+        guildId,
+        moderator: interaction.user.tag,
+        moderatorId: interaction.user.id,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
 
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
@@ -545,7 +623,13 @@ export class LevelService {
     const botMember = member.guild.members.me;
 
     if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-      console.log("Nao foi possivel aplicar cargo: bot sem ManageRoles.");
+      logger.warn("MODERATION", "ROLE_APPLY_SKIPPED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        roleId,
+        reason: "missing ManageRoles permission"
+      });
       return {
         ok: false,
         reason: "o bot não tem permissão Manage Roles."
@@ -555,7 +639,12 @@ export class LevelService {
     const role = member.guild.roles.cache.get(roleId);
 
     if (!role) {
-      console.log(`Cargo nao encontrado: ${roleId}`);
+      logger.warn("MODERATION", "ROLE_NOT_FOUND", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        roleId
+      });
       return {
         ok: false,
         reason: "o cargo configurado não existe no servidor."
@@ -563,7 +652,14 @@ export class LevelService {
     }
 
     if (role.position >= botMember.roles.highest.position) {
-      console.log(`Cargo acima ou igual ao cargo do bot: ${role.name}`);
+      logger.warn("MODERATION", "ROLE_APPLY_SKIPPED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        role: role.name,
+        roleId,
+        reason: "role position too high"
+      });
       return {
         ok: false,
         reason: `o cargo ${role.name} está acima ou no mesmo nível do cargo do bot.`
@@ -614,7 +710,13 @@ export class LevelService {
     try {
       await member.send(message);
     } catch (error) {
-      console.error("Erro ao enviar DM para usuario sobre aprovacao de cargo:", error);
+      logger.error("MODERATION", "ROLE_APPROVAL_DM_FAILED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }
 

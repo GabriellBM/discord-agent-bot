@@ -65,7 +65,7 @@ O bot registra comandos slash automaticamente, responde a eventos do servidor, c
 | XP e niveis | XP por mensagem, cooldown anti-spam, rank individual, top 10, comandos owner para ajuste manual |
 | Cargos | cargos acumulativos por nivel, cargo MAX com aprovacao, cargo superior solicitado no chat |
 | Automod | lista local, OpenAI Moderation API, tolerancia por cargo, usuarios/cargos imunes e punicoes automaticas |
-| Logs | mensagens, edicoes, delecoes, voz, XP, level up e automod em canal configurado |
+| Logs | mensagens, edicoes, delecoes, voz, XP, level up e automod no stdout do container para Portainer |
 | Musica | `/music`, fila por servidor, YouTube, volume, loop, pausa, resume, votacoes e saida automatica |
 | OpenAI | `/ask` preparado com Responses API, atualmente mantido desabilitado para evitar custos |
 
@@ -254,8 +254,16 @@ LEVELS_FILE_PATH=/app/data/levels.json
 Suba o bot:
 
 ```bash
-docker compose up -d --build
+npm run docker:up
 ```
+
+A imagem gerada pelo Compose usa o nome e a versao do `package.json`:
+
+```text
+discord-agent-bot:v1.1.0
+```
+
+Se preferir rodar `docker compose up -d --build` diretamente, o Compose usa os valores padrao definidos no `docker-compose.yml`.
 
 Ver logs em tempo real:
 
@@ -353,9 +361,9 @@ Quando o owner executa `/top10`, a resposta aparece publicamente. Para outros us
 
 | Comando | Quem pode usar | Descricao |
 | --- | --- | --- |
-| `/automod status` | Owner | Mostra status, thresholds, regras e canal de logs |
+| `/automod status` | Owner | Mostra status, thresholds, regras e destino dos logs |
 | `/automod test texto` | Owner | Testa a lista local e a OpenAI Moderation API sem punir |
-| `/automod logtest` | Owner | Envia um log de teste no canal configurado |
+| `/automod logtest` | Owner | Gera um log de teste no stdout do bot |
 
 ### Musica
 
@@ -494,7 +502,6 @@ export const AUTOMOD_CONFIG = {
     minTextLength: 3
   },
   deleteMessage: true,
-  logChannelId: "ID_DO_CANAL_DE_LOGS",
   ignoredRoleIds: [],
   ignoredUserIds: [],
   roleToleranceRules: []
@@ -579,7 +586,7 @@ O bot desconecta automaticamente quando:
 
 ## Logs do servidor
 
-O bot registra atividades no canal configurado em `AUTOMOD_CONFIG.logChannelId`.
+O bot registra atividades no stdout do container, em linhas compactas para consulta no Portainer.
 
 Eventos cobertos:
 
@@ -642,7 +649,6 @@ Antes de rodar em servidor real:
 - [ ] Configurar `DISCORD_CLIENT_ID`;
 - [ ] Configurar `DISCORD_GUILD_ID` durante testes;
 - [ ] Configurar IDs de cargos em `level.config.ts`;
-- [ ] Configurar canal de logs em `automod.config.ts`;
 - [ ] Configurar cargos/usuarios imunes do automod;
 - [ ] Colocar o cargo do bot acima dos cargos gerenciados;
 - [ ] Rodar `npm run build`;
@@ -663,7 +669,7 @@ Antes de rodar em servidor real:
 - Revisar `forbiddenWords` para evitar falsos positivos;
 - Monitorar custos da OpenAI;
 - Manter o bot com o minimo de permissoes necessario;
-- Separar canal de logs privado para moderadores/owner.
+- Acompanhar logs pelo Portainer e restringir acesso ao painel.
 
 ---
 

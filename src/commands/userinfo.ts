@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types/Command";
+import { logger } from "../utils/logger";
 
 export const data = new SlashCommandBuilder()
   .setName("userinfo")
@@ -13,7 +14,7 @@ export const execute: Command["execute"] = async (interaction) => {
 
   try {
     if (!interaction.guild) {
-      await interaction.editReply("⚠️ Este comando só pode ser usado em um servidor.");
+      await interaction.editReply("Este comando so pode ser usado em um servidor.");
       return;
     }
 
@@ -26,14 +27,19 @@ export const execute: Command["execute"] = async (interaction) => {
 
     await interaction.editReply(
       [
-        `👤 Nome: ${user.tag}`,
+        `Nome: ${user.tag}`,
         `ID: ${user.id}`,
-        `Entrou em: ${member.joinedAt?.toLocaleDateString("pt-BR") ?? "Não informado"}`,
+        `Entrou em: ${member.joinedAt?.toLocaleDateString("pt-BR") ?? "Nao informado"}`,
         `Cargos: ${roles.length > 0 ? roles.join(", ") : "Nenhum cargo"}`
       ].join("\n")
     );
   } catch (error) {
-    console.error("Erro ao executar /userinfo:", error);
-    await interaction.editReply("⚠️ Não consegui buscar as informações desse usuário agora.");
+    logger.error("DISCORD", "USER_INFO_FAILED", {
+      user: interaction.user.tag,
+      userId: interaction.user.id,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    await interaction.editReply("Nao consegui buscar as informacoes desse usuario agora.");
   }
 };

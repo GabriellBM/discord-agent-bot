@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import { LevelService } from "../services/level.service";
 import type { Command } from "../types/Command";
+import { logger } from "../utils/logger";
 
 const levelService = new LevelService();
 
@@ -23,17 +24,22 @@ export const execute: Command["execute"] = async (interaction) => {
     const leaderboard = await levelService.getLeaderboard(interaction.guild, 10);
 
     if (leaderboard.length === 0) {
-      await interaction.editReply("📭 Ainda não há dados de XP neste servidor.");
+      await interaction.editReply("Ainda nao ha dados de XP neste servidor.");
       return;
     }
 
     const lines = leaderboard.map(({ member, data }, index) => {
-      return `${index + 1}. ${member.displayName} - Nível ${data.level} (${data.xp} XP)`;
+      return `${index + 1}. ${member.displayName} - Nivel ${data.level} (${data.xp} XP)`;
     });
 
-    await interaction.editReply(["🏆 Top 10 de XP", ...lines].join("\n"));
+    await interaction.editReply(["Top 10 de XP", ...lines].join("\n"));
   } catch (error) {
-    console.error("Erro ao executar /leaderboard:", error);
-    await interaction.editReply("⚠️ Não consegui buscar o top 10 agora. Tente novamente em instantes.");
+    logger.error("MODERATION", "LEADERBOARD_FAILED", {
+      user: interaction.user.tag,
+      userId: interaction.user.id,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    await interaction.editReply("Nao consegui buscar o top 10 agora. Tente novamente em instantes.");
   }
 };

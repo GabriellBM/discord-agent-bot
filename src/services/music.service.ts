@@ -27,6 +27,7 @@ import ytdl from "@distube/ytdl-core";
 import play from "play-dl";
 import { GuildMusicState, LoopMode, MusicVoteType, Track } from "../types/music.types";
 import { fetchPublicBotChannel } from "../utils/bot-channel.util";
+import { logger } from "../utils/logger";
 
 type MusicAction = () => Promise<void>;
 
@@ -79,7 +80,15 @@ export class MusicService {
         ]
       });
     } catch (error) {
-      console.error("Erro ao adicionar música:", error);
+      logger.error("MUSIC", "PLAY_FAILED", {
+        user: interaction.user.username,
+        userId: interaction.user.id,
+        channelId: interaction.channelId,
+        guild: interaction.guild?.name,
+        track: url,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       await interaction.editReply({
         embeds: [
           this.errorEmbed(
@@ -374,7 +383,12 @@ export class MusicService {
           components: []
         });
       } catch (error) {
-        console.error("Erro ao encerrar votação de música:", error);
+        logger.error("MUSIC", "VOTE_FINISH_FAILED", {
+          guildId: interaction.guildId,
+          voteType: type,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
       }
     }, voteTimeoutMs);
   }
@@ -471,7 +485,12 @@ export class MusicService {
     });
 
     player.on("error", (error) => {
-      console.error("Erro no player de música:", error);
+      logger.error("MUSIC", "PLAYER_ERROR", {
+        guild: guild.name,
+        guildId: guild.id,
+        error: error.message,
+        stack: error.stack
+      });
       void this.playNext(guild.id);
     });
 
@@ -516,7 +535,11 @@ export class MusicService {
         duration: details.durationInSec ? this.formatDuration(details.durationInSec) : undefined
       };
     } catch (playError) {
-      console.error("play-dl não conseguiu buscar informações do vídeo, tentando ytdl:", playError);
+      logger.warn("MUSIC", "PLAY_DL_INFO_FAILED", {
+        url: normalizedUrl,
+        error: playError instanceof Error ? playError.message : String(playError),
+        stack: playError instanceof Error ? playError.stack : undefined
+      });
       const info = await ytdl.getInfo(normalizedUrl, {
         requestOptions: {
           headers: {
@@ -572,7 +595,13 @@ export class MusicService {
       resource.volume?.setVolume(state.volume / 100);
       state.player.play(resource);
     } catch (error) {
-      console.error(`Erro ao tocar música ${nextTrack.title}:`, error);
+      logger.error("MUSIC", "PLAY_FAILED", {
+        guildId,
+        track: nextTrack.title,
+        requestedBy: nextTrack.requestedBy,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       await this.playNext(guildId);
     }
   }
@@ -759,7 +788,12 @@ export class MusicService {
     try {
       return state?.guild ? fetchPublicBotChannel(state.guild, channelId) : null;
     } catch (error) {
-      console.error("Erro ao buscar canal de texto de música:", error);
+      logger.error("MUSIC", "TEXT_CHANNEL_FETCH_FAILED", {
+        guildId,
+        channelId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return null;
     }
   }
@@ -839,21 +873,35 @@ export class MusicService {
       const message = String(chunk).trim();
 
       if (message) {
-        console.error(`yt-dlp (${track.title}): ${message}`);
+        logger.error("MUSIC", "YT_DLP_STDERR", {
+          track: track.title,
+          message
+        });
       }
     });
 
     subprocess.stdout?.on("error", (error) => {
-      console.error(`Erro no stdout do yt-dlp de ${track.title}:`, error);
+      logger.error("MUSIC", "YT_DLP_STDOUT_FAILED", {
+        track: track.title,
+        error: error.message,
+        stack: error.stack
+      });
     });
 
     subprocess.on("error", (error) => {
-      console.error(`Erro no processo yt-dlp de ${track.title}:`, error);
+      logger.error("MUSIC", "YT_DLP_PROCESS_FAILED", {
+        track: track.title,
+        error: error.message,
+        stack: error.stack
+      });
     });
 
     subprocess.on("close", (code) => {
       if (code && code !== 0) {
-        console.error(`yt-dlp encerrou com codigo ${code} em ${track.title}.`);
+        logger.error("MUSIC", "YT_DLP_EXITED", {
+          track: track.title,
+          code
+        });
       }
     });
 

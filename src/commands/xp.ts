@@ -1,10 +1,9 @@
 import { GuildMember, GuildTextBasedChannel, SlashCommandBuilder } from "discord.js";
 import { LevelService } from "../services/level.service";
-import { LogService } from "../services/log.service";
 import type { Command } from "../types/Command";
+import { logger } from "../utils/logger";
 
 const levelService = new LevelService();
-const logService = new LogService();
 
 export const data = new SlashCommandBuilder()
   .setName("xp")
@@ -92,8 +91,8 @@ export const execute: Command["execute"] = async (interaction) => {
 
     if (subcommand === "sync") {
       const data = await levelService.getUser(interaction.guild.id, user.id);
-
       const removedRoles = await levelService.removeInvalidLevelRoles(member, data.level);
+
       await levelService.applyLevelRoles(member, data.level);
       if (interaction.channel?.isTextBased()) {
         await levelService.requestMaxRoleApproval(
@@ -102,34 +101,40 @@ export const execute: Command["execute"] = async (interaction) => {
           interaction.channel as GuildTextBasedChannel
         );
       }
+
       await notifyRemovedRoles(member, removedRoles);
-      await logService.send(interaction.guild, "Log de XP Manual", [
-        `Executor: ${interaction.user.tag}`,
-        `Usuario: ${user.tag}`,
-        `Acao: sync`,
-        `Nivel atual: ${data.level}`,
-        `Cargos removidos: ${removedRoles.length > 0 ? removedRoles.join(", ") : "nenhum"}`
-      ]);
-      await interaction.editReply(
-        `✅ Cargos de nível sincronizados para ${user.tag}. Nível atual: ${data.level}.`
-      );
+      logger.info("MODERATION", "XP_SYNC", {
+        moderator: interaction.user.tag,
+        moderatorId: interaction.user.id,
+        user: user.tag,
+        userId: user.id,
+        guild: interaction.guild.name,
+        level: data.level,
+        removedRoles: removedRoles.length
+      });
+      await interaction.editReply(`Cargos de nivel sincronizados para ${user.tag}. Nivel atual: ${data.level}.`);
       return;
     }
 
     if (subcommand === "reset") {
       const data = await levelService.resetUserLevel(interaction.guild.id, user.id);
       const removedRoles = await levelService.removeInvalidLevelRoles(member, data.level);
+
       await notifyRemovedRoles(member, removedRoles);
-      await logService.send(interaction.guild, "Log de XP Manual", [
-        `Executor: ${interaction.user.tag}`,
-        `Usuario: ${user.tag}`,
-        `Acao: reset`,
-        `Motivo: ${reason}`,
-        `Cargos removidos: ${removedRoles.length > 0 ? removedRoles.join(", ") : "nenhum"}`
-      ]);
-      console.log(`XP resetado para ${user.tag} por ${interaction.user.tag}. Motivo: ${reason}`);
+      logger.warn("MODERATION", "XP_RESET", {
+        moderator: interaction.user.tag,
+        moderatorId: interaction.user.id,
+        user: user.tag,
+        userId: user.id,
+        guild: interaction.guild.name,
+        reason,
+        removedRoles: removedRoles.length,
+        level: data.level,
+        xp: data.xp,
+        messages: data.messages
+      });
       await interaction.editReply(
-        `✅ ${user.tag} foi resetado. Nível: ${data.level}, XP: ${data.xp}, mensagens: ${data.messages}.`
+        `${user.tag} foi resetado. Nivel: ${data.level}, XP: ${data.xp}, mensagens: ${data.messages}.`
       );
       return;
     }
@@ -159,34 +164,46 @@ export const execute: Command["execute"] = async (interaction) => {
       }
     }
 
-    await logService.send(interaction.guild, "Log de XP Manual", [
-      `Executor: ${interaction.user.tag}`,
-      `Usuario: ${user.tag}`,
-      `Acao: ${subcommand}`,
-      `Quantidade: ${amount}`,
-      `Motivo: ${reason}`,
-      `Nivel anterior: ${previousLevel}`,
-      `Nivel atual: ${data.level}`,
-      `XP atual: ${data.xp}/${levelService.getRequiredXp(data.level)}`
-    ]);
+    logger.info("MODERATION", "XP_MANUAL_CHANGE", {
+      moderator: interaction.user.tag,
+      moderatorId: interaction.user.id,
+      user: user.tag,
+      userId: user.id,
+      guild: interaction.guild.name,
+      action: subcommand,
+      amount,
+      reason,
+      previousLevel,
+      level: data.level,
+      xp: data.xp,
+      requiredXp: levelService.getRequiredXp(data.level)
+    });
 
     if (data.level > previousLevel) {
       try {
-        await member.send(`🎉 Parabéns! Você subiu para o nível ${data.level}.`);
+        await member.send(`Parabens! Voce subiu para o nivel ${data.level}.`);
       } catch (error) {
-        console.error("Nao foi possivel enviar DM de level up manual:", error);
+        logger.error("MODERATION", "MANUAL_LEVEL_UP_DM_FAILED", {
+          user: user.tag,
+          userId: user.id,
+          guild: interaction.guild.name,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
       }
     }
 
-    console.log(
-      `XP alterado para ${user.tag} por ${interaction.user.tag}. Acao: ${subcommand}. Quantidade: ${amount}. Motivo: ${reason}`
-    );
     await interaction.editReply(
-      `✅ ${user.tag} atualizado. Nível: ${data.level}, XP: ${data.xp}/${levelService.getRequiredXp(data.level)}.`
+      `${user.tag} atualizado. Nivel: ${data.level}, XP: ${data.xp}/${levelService.getRequiredXp(data.level)}.`
     );
   } catch (error) {
-    console.error("Erro ao executar /xp:", error);
-    await interaction.editReply("⚠️ Não consegui alterar o XP agora. Tente novamente em instantes.");
+    logger.error("MODERATION", "XP_COMMAND_FAILED", {
+      moderator: interaction.user.tag,
+      moderatorId: interaction.user.id,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    await interaction.editReply("Nao consegui alterar o XP agora. Tente novamente em instantes.");
   }
 };
 
@@ -199,8 +216,14 @@ async function notifyRemovedRoles(
   }
 
   try {
-    await member.send(`⚠️ Você perdeu o(s) cargo(s) ${removedRoles.join(", ")} por queda nos pontos.`);
+    await member.send(`Voce perdeu o(s) cargo(s) ${removedRoles.join(", ")} por queda nos pontos.`);
   } catch (error) {
-    console.error("Nao foi possivel enviar DM de perda de cargo:", error);
+    logger.error("MODERATION", "ROLE_LOSS_DM_FAILED", {
+      user: member.user.tag,
+      userId: member.id,
+      guild: member.guild.name,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
   }
 }

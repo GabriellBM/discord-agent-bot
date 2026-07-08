@@ -7,8 +7,8 @@ import {
 import { AUTOMOD_CONFIG } from "../config/automod.config";
 import { AutomodRule, findForbiddenWord, getModerationRuleForMember, isUserImmune } from "../utils/automod.util";
 import { fetchPublicBotChannel } from "../utils/bot-channel.util";
+import { logger } from "../utils/logger";
 import { LevelService } from "./level.service";
-import { LogService } from "./log.service";
 import { OpenAIModerationResult, OpenAIModerationService } from "./openai-moderation.service";
 
 interface AutomodLogPayload {
@@ -25,7 +25,6 @@ interface AutomodLogPayload {
 }
 
 export class AutomodService {
-  private readonly logService = new LogService();
   private readonly moderationService = new OpenAIModerationService();
   private lastRateLimitLogAt = 0;
 
@@ -75,7 +74,13 @@ export class AutomodService {
         return false;
       }
 
-      console.error("OpenAI Moderation API falhou:", analysis.error);
+      logger.error("AI", "MODERATION_FAILED", {
+        user: message.author.tag,
+        userId: message.author.id,
+        channelId: message.channel.id,
+        guild: message.guild.name,
+        error: analysis.error
+      });
       await this.sendAutomodLog(message.guild, {
         member,
         channelId: message.channel.id,
@@ -104,7 +109,14 @@ export class AutomodService {
         await message.delete();
         messageDeleted = true;
       } catch (error) {
-        console.error("Automod não conseguiu deletar mensagem:", error);
+        logger.error("MODERATION", "MESSAGE_DELETE_FAILED", {
+          user: message.author.tag,
+          userId: message.author.id,
+          channelId: message.channel.id,
+          guild: message.guild.name,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
       }
     }
 
@@ -118,7 +130,7 @@ export class AutomodService {
 
       if (rolesRemoved && publicBotChannel) {
         await publicBotChannel.send(
-          `⚠️ ${member}, você perdeu o(s) cargo(s) ${removedRoles.join(", ")} por queda nos pontos.`
+          `${member}, voce perdeu o(s) cargo(s) ${removedRoles.join(", ")} por queda nos pontos.`
         );
       }
     }
@@ -131,8 +143,8 @@ export class AutomodService {
 
     if (publicBotChannel) {
       const publicMessage = analysis.isSevere
-        ? `🚨 ${member}, sua mensagem foi detectada como violação grave das regras. Você perdeu ${rule.xpPenalty} XP.`
-        : `⚠️ ${member}, sua mensagem violou as regras. Você perdeu ${rule.xpPenalty} XP.`;
+        ? `${member}, sua mensagem foi detectada como violacao grave das regras. Voce perdeu ${rule.xpPenalty} XP.`
+        : `${member}, sua mensagem violou as regras. Voce perdeu ${rule.xpPenalty} XP.`;
 
       await publicBotChannel.send(publicMessage);
     }
@@ -154,41 +166,29 @@ export class AutomodService {
   }
 
   async sendAutomodLog(guild: Guild, payload: AutomodLogPayload) {
-    await this.logService.send(guild, "Automod", [
-      `Origem: ${payload.localMatch ? "lista local + automod" : "OpenAI Moderation API"}`,
-      `Usuario: ${payload.member.user.tag}`,
-      `ID do usuario: ${payload.member.id}`,
-      `Canal: <#${payload.channelId}>`,
-      `Motivo: ${payload.localMatch ?? payload.analysis.detectedCategory ?? "moderacao automatica"}`,
-      `Gravidade: ${payload.analysis.isSevere ? "severa" : "normal"}`,
-      `Mensagem deletada: ${payload.messageDeleted ? "sim" : "nao"}`,
-      `XP removido: ${payload.xpRemoved}`,
-      `Timeout aplicado: ${payload.timeoutApplied ? "sim" : "nao"}`,
-      `Cargos removidos: ${payload.rolesRemoved ? "sim" : "nao"}`,
-      `Conteudo: ${payload.messageContent}`,
-      `Erro: ${payload.analysis.error ?? "nenhum"}`
-    ]);
+    logger.warn("MODERATION", "AUTOMOD_ACTION", {
+      source: payload.localMatch ? "local list + automod" : "OpenAI Moderation API",
+      user: payload.member.user.tag,
+      userId: payload.member.id,
+      channelId: payload.channelId,
+      guild: guild.name,
+      reason: payload.localMatch ?? payload.analysis.detectedCategory ?? "automatic moderation",
+      severity: payload.analysis.isSevere ? "severe" : "normal",
+      messageDeleted: payload.messageDeleted,
+      xpRemoved: payload.xpRemoved,
+      timeoutApplied: payload.timeoutApplied,
+      rolesRemoved: payload.rolesRemoved,
+      content: payload.messageContent,
+      error: payload.analysis.error
+    });
   }
 
   async sendTestLog(guild: Guild, member: GuildMember) {
-    await this.sendAutomodLog(guild, {
-      member,
-      channelId: AUTOMOD_CONFIG.logChannelId,
-      messageContent: "Mensagem de teste do automod",
-      analysis: {
-        enabled: true,
-        success: true,
-        flagged: false,
-        maxScore: 0,
-        isSevere: false,
-        categories: {},
-        categoryScores: {},
-        shouldPunish: false
-      },
-      messageDeleted: false,
-      xpRemoved: 0,
-      timeoutApplied: false,
-      rolesRemoved: false
+    logger.info("MODERATION", "LOG_TEST", {
+      user: member.user.tag,
+      userId: member.id,
+      guild: guild.name,
+      source: "stdout"
     });
   }
 
@@ -197,19 +197,36 @@ export class AutomodService {
       const botMember = member.guild.members.me;
 
       if (!botMember?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-        console.log("Automod não aplicou timeout: bot sem ModerateMembers.");
+        logger.warn("MODERATION", "TIMEOUT_SKIPPED", {
+          user: member.user.tag,
+          userId: member.id,
+          guild: member.guild.name,
+          reason: "missing ModerateMembers permission"
+        });
         return false;
       }
 
       if (!member.moderatable) {
-        console.log(`Automod não conseguiu aplicar timeout em ${member.user.tag}.`);
+        logger.warn("MODERATION", "TIMEOUT_SKIPPED", {
+          user: member.user.tag,
+          userId: member.id,
+          guild: member.guild.name,
+          reason: "member not moderatable"
+        });
         return false;
       }
 
       await member.timeout(timeoutMinutes * 60 * 1000, "Automod: OpenAI Moderation API");
       return true;
     } catch (error) {
-      console.error("Erro ao aplicar timeout do automod:", error);
+      logger.error("MODERATION", "TIMEOUT_FAILED", {
+        user: member.user.tag,
+        userId: member.id,
+        guild: member.guild.name,
+        timeoutMinutes,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return false;
     }
   }
@@ -222,10 +239,12 @@ export class AutomodService {
     }
 
     this.lastRateLimitLogAt = now;
-    console.warn(
-      `OpenAI Moderation API em cooldown por limite de requisições. Tentando novamente em ${Math.ceil((analysis.retryAfterMs ?? 0) / 1000)}s.`
-    );
+    logger.warn("AI", "RATE_LIMITED", {
+      service: "OpenAI Moderation API",
+      retryAfterSeconds: Math.ceil((analysis.retryAfterMs ?? 0) / 1000)
+    });
   }
+
   private createLocalModerationResult(word?: string): OpenAIModerationResult {
     return {
       enabled: true,

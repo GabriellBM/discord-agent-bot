@@ -1,15 +1,12 @@
 import { Events, Message, PartialMessage } from "discord.js";
-import { AUTOMOD_CONFIG } from "../config/automod.config";
-import { LogService } from "../services/log.service";
-
-const logService = new LogService();
+import { logger } from "../utils/logger";
 
 export const name = Events.MessageUpdate;
 export const once = false;
 
 export async function execute(oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) {
   try {
-    if (!newMessage.guild || newMessage.channel.id === AUTOMOD_CONFIG.logChannelId) {
+    if (!newMessage.guild) {
       return;
     }
 
@@ -17,14 +14,18 @@ export async function execute(oldMessage: Message | PartialMessage, newMessage: 
       return;
     }
 
-    await logService.send(newMessage.guild, "Log de Mensagem Editada", [
-      `Autor: ${newMessage.author?.tag ?? oldMessage.author?.tag ?? "desconhecido"}`,
-      `ID do autor: ${newMessage.author?.id ?? oldMessage.author?.id ?? "desconhecido"}`,
-      `Canal: <#${newMessage.channel.id}>`,
-      `Antes: ${oldMessage.content || "[conteudo indisponivel]"}`,
-      `Depois: ${newMessage.content || "[conteudo indisponivel]"}`
-    ]);
+    logger.info("MODERATION", "MESSAGE_UPDATED", {
+      user: newMessage.author?.tag ?? oldMessage.author?.tag,
+      userId: newMessage.author?.id ?? oldMessage.author?.id,
+      channelId: newMessage.channel.id,
+      guild: newMessage.guild.name,
+      before: oldMessage.content || "[content unavailable]",
+      after: newMessage.content || "[content unavailable]"
+    });
   } catch (error) {
-    console.error("Erro ao registrar mensagem editada:", error);
+    logger.error("MODERATION", "MESSAGE_UPDATE_LOG_FAILED", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
   }
 }

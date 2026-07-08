@@ -3,6 +3,7 @@ import { readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { Command } from "../types/Command";
+import { logger } from "../utils/logger";
 
 const requireCommand = createRequire(__filename);
 
@@ -24,12 +25,17 @@ export async function loadCommands(commandsPath = path.join(__dirname, "..", "co
     }) as Command | undefined;
 
     if (!command?.data?.name || typeof command.execute !== "function") {
-      console.warn(`Comando ignorado por formato invalido: ${file}`);
+      logger.warn("SYSTEM", "COMMAND_SKIPPED", {
+        file,
+        reason: "invalid format"
+      });
       continue;
     }
 
     if (command.enabled === false) {
-      console.log(`Comando desabilitado: /${command.data.name}`);
+      logger.info("SYSTEM", "COMMAND_DISABLED", {
+        command: command.data.name
+      });
       continue;
     }
 

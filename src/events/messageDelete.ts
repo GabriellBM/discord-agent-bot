@@ -1,25 +1,26 @@
 import { Events, Message, PartialMessage } from "discord.js";
-import { AUTOMOD_CONFIG } from "../config/automod.config";
-import { LogService } from "../services/log.service";
-
-const logService = new LogService();
+import { logger } from "../utils/logger";
 
 export const name = Events.MessageDelete;
 export const once = false;
 
 export async function execute(message: Message | PartialMessage) {
   try {
-    if (!message.guild || message.channel.id === AUTOMOD_CONFIG.logChannelId) {
+    if (!message.guild) {
       return;
     }
 
-    await logService.send(message.guild, "Log de Mensagem Apagada", [
-      `Autor: ${message.author?.tag ?? "desconhecido"}`,
-      `ID do autor: ${message.author?.id ?? "desconhecido"}`,
-      `Canal: <#${message.channel.id}>`,
-      `Conteudo: ${message.content || "[conteudo indisponivel]"}`
-    ]);
+    logger.warn("MODERATION", "MESSAGE_DELETED", {
+      user: message.author?.tag,
+      userId: message.author?.id,
+      channelId: message.channel.id,
+      guild: message.guild.name,
+      content: message.content || "[content unavailable]"
+    });
   } catch (error) {
-    console.error("Erro ao registrar mensagem apagada:", error);
+    logger.error("MODERATION", "MESSAGE_DELETE_LOG_FAILED", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
   }
 }

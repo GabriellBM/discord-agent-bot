@@ -1,5 +1,6 @@
 services:
   discord-agent-bot:
+    image: ${npm_package_name}:v${npm_package_version}
     build:
       context: .
     container_name: discord-agent-bot

@@ -2,6 +2,7 @@ import { Client } from "discord.js";
 import { readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { logger } from "../utils/logger";
 
 const requireEvent = createRequire(__filename);
 
@@ -23,7 +24,10 @@ export async function loadEvents(client: Client, eventsPath = path.join(__dirnam
     const event = requireEvent(filePath) as EventModule;
 
     if (!event.name || typeof event.execute !== "function") {
-      console.warn(`Evento ignorado por formato invalido: ${file}`);
+      logger.warn("SYSTEM", "EVENT_SKIPPED", {
+        file,
+        reason: "invalid format"
+      });
       continue;
     }
 

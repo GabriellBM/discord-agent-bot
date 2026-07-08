@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
-import { moderationPermissions, validateModerationAction } from "../utils/permission.util";
 import type { Command } from "../types/Command";
+import { logger } from "../utils/logger";
+import { moderationPermissions, validateModerationAction } from "../utils/permission.util";
 
 export const data = new SlashCommandBuilder()
   .setName("kick")
@@ -18,7 +19,7 @@ export const execute: Command["execute"] = async (interaction) => {
 
   try {
     if (!interaction.guild) {
-      await interaction.editReply("⚠️ Este comando só pode ser usado em um servidor.");
+      await interaction.editReply("Este comando so pode ser usado em um servidor.");
       return;
     }
 
@@ -36,10 +37,22 @@ export const execute: Command["execute"] = async (interaction) => {
     }
 
     await targetMember.kick(reason);
-    console.log(`Usuario ${user.tag} expulso por ${interaction.user.tag}. Motivo: ${reason}`);
-    await interaction.editReply(`✅ ${user.tag} foi expulso. Motivo: ${reason}`);
+    logger.warn("MODERATION", "KICK", {
+      user: user.tag,
+      userId: user.id,
+      moderator: interaction.user.tag,
+      moderatorId: interaction.user.id,
+      guild: interaction.guild.name,
+      reason
+    });
+    await interaction.editReply(`${user.tag} foi expulso. Motivo: ${reason}`);
   } catch (error) {
-    console.error("Erro ao executar /kick:", error);
-    await interaction.editReply("⚠️ Não consegui expulsar esse usuário. Tente novamente em instantes.");
+    logger.error("MODERATION", "KICK_FAILED", {
+      moderator: interaction.user.tag,
+      moderatorId: interaction.user.id,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    await interaction.editReply("Nao consegui expulsar esse usuario. Tente novamente em instantes.");
   }
 };

@@ -1,12 +1,11 @@
 import { Events, Message } from "discord.js";
 import { AutomodService } from "../services/automod.service";
 import { LevelService } from "../services/level.service";
-import { LogService } from "../services/log.service";
 import { fetchPublicBotChannel } from "../utils/bot-channel.util";
+import { logger } from "../utils/logger";
 
 const automodService = new AutomodService();
 const levelService = new LevelService();
-const logService = new LogService();
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -19,12 +18,13 @@ export async function execute(message: Message) {
 
     const member = message.member ?? (await message.guild.members.fetch(message.author.id));
 
-    logService.writeToConsole("Log de Mensagem", [
-      `Autor: ${message.author.tag}`,
-      `ID do autor: ${message.author.id}`,
-      `Canal: <#${message.channel.id}>`,
-      `Conteudo: ${message.content || "[sem conteudo textual]"}`
-    ]);
+    logger.debug("DISCORD", "MESSAGE_RECEIVED", {
+      user: message.author.tag,
+      userId: message.author.id,
+      channelId: message.channel.id,
+      guild: message.guild.name,
+      content: message.content || "[no text content]"
+    });
 
     const handledByAutomod = await automodService.handleMessage(message);
 
@@ -36,15 +36,16 @@ export async function execute(message: Message) {
 
     if (!result.onCooldown) {
       await levelService.applyLevelRoles(member, result.data.level);
-      logService.writeToConsole("Log de XP", [
-        `Usuario: ${message.author.tag}`,
-        `ID do usuario: ${message.author.id}`,
-        `Canal: <#${message.channel.id}>`,
-        `Acao: ganhou XP por mensagem`,
-        `XP ganho: ${result.gainedXp}`,
-        `Nivel atual: ${result.data.level}`,
-        `XP atual: ${result.data.xp}/${levelService.getRequiredXp(result.data.level)}`
-      ]);
+      logger.info("MODERATION", "XP_GAINED", {
+        user: message.author.tag,
+        userId: message.author.id,
+        channelId: message.channel.id,
+        guild: message.guild.name,
+        gainedXp: result.gainedXp,
+        level: result.data.level,
+        xp: result.data.xp,
+        requiredXp: levelService.getRequiredXp(result.data.level)
+      });
     }
 
     if (!result.leveledUp) {
@@ -56,26 +57,43 @@ export async function execute(message: Message) {
     if (publicBotChannel) {
       try {
         await publicBotChannel.send(
-          `🎉 Parabéns, ${message.author}! Você subiu para o nível ${result.data.level}.`
+          `Parabens, ${message.author}! Voce subiu para o nivel ${result.data.level}.`
         );
       } catch (error) {
-        console.error("Nao foi possivel enviar mensagem de level up:", error);
+        logger.error("MODERATION", "LEVEL_UP_MESSAGE_FAILED", {
+          user: message.author.tag,
+          userId: message.author.id,
+          channelId: publicBotChannel.id,
+          guild: message.guild.name,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
       }
     } else {
-      console.log("Nao foi possivel enviar level up: canal sem suporte a envio de mensagem.");
+      logger.warn("MODERATION", "LEVEL_UP_MESSAGE_SKIPPED", {
+        user: message.author.tag,
+        userId: message.author.id,
+        channelId: message.channel.id,
+        guild: message.guild.name,
+        reason: "text channel unavailable"
+      });
     }
 
-    await logService.send(message.guild, "Log de Level Up", [
-      `Usuario: ${message.author.tag}`,
-      `ID do usuario: ${message.author.id}`,
-      `Canal: <#${message.channel.id}>`,
-      `Novo nivel: ${result.data.level}`
-    ]);
+    logger.success("MODERATION", "LEVEL_UP", {
+      user: message.author.tag,
+      userId: message.author.id,
+      channelId: message.channel.id,
+      guild: message.guild.name,
+      level: result.data.level
+    });
 
     if (message.channel.isTextBased()) {
       await levelService.requestMaxRoleApproval(member, result.data.level, message.channel);
     }
   } catch (error) {
-    console.error("Erro ao processar XP da mensagem:", error);
+    logger.error("MODERATION", "MESSAGE_XP_FAILED", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
   }
 }

@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
-import { moderationPermissions, validateModerationAction } from "../utils/permission.util";
 import type { Command } from "../types/Command";
+import { logger } from "../utils/logger";
+import { moderationPermissions, validateModerationAction } from "../utils/permission.util";
 
 const millisecondsPerMinute = 60 * 1000;
 const maxTimeoutMinutes = 28 * 24 * 60;
@@ -29,7 +30,7 @@ export const execute: Command["execute"] = async (interaction) => {
 
   try {
     if (!interaction.guild) {
-      await interaction.editReply("⚠️ Este comando só pode ser usado em um servidor.");
+      await interaction.editReply("Este comando so pode ser usado em um servidor.");
       return;
     }
 
@@ -39,7 +40,7 @@ export const execute: Command["execute"] = async (interaction) => {
     const targetMember = await interaction.guild.members.fetch(user.id);
 
     if (minutes < 1 || minutes > maxTimeoutMinutes) {
-      await interaction.editReply("⚠️ Informe uma duração entre 1 minuto e 28 dias.");
+      await interaction.editReply("Informe uma duracao entre 1 minuto e 28 dias.");
       return;
     }
 
@@ -53,12 +54,23 @@ export const execute: Command["execute"] = async (interaction) => {
     }
 
     await targetMember.timeout(minutes * millisecondsPerMinute, reason);
-    console.log(
-      `Timeout aplicado em ${user.tag} por ${interaction.user.tag}. Minutos: ${minutes}. Motivo: ${reason}`
-    );
-    await interaction.editReply(`✅ ${user.tag} recebeu timeout por ${minutes} minuto(s). Motivo: ${reason}`);
+    logger.warn("MODERATION", "TIMEOUT", {
+      user: user.tag,
+      userId: user.id,
+      moderator: interaction.user.tag,
+      moderatorId: interaction.user.id,
+      guild: interaction.guild.name,
+      minutes,
+      reason
+    });
+    await interaction.editReply(`${user.tag} recebeu timeout por ${minutes} minuto(s). Motivo: ${reason}`);
   } catch (error) {
-    console.error("Erro ao executar /timeout:", error);
-    await interaction.editReply("⚠️ Não consegui aplicar timeout nesse usuário. Tente novamente em instantes.");
+    logger.error("MODERATION", "TIMEOUT_FAILED", {
+      moderator: interaction.user.tag,
+      moderatorId: interaction.user.id,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    await interaction.editReply("Nao consegui aplicar timeout nesse usuario. Tente novamente em instantes.");
   }
 };
